@@ -1,74 +1,55 @@
 # Annotation Policy
 
-This policy separates rules demonstrated by official evidence from provisional rules that require organizer clarification or labeled data.
+This policy separates official observations and mandatory local invariants from provisional rules.
 
-## Verified rules
+## Official observations and mandatory local invariants
 
 ### Raw text and offsets
 
 - Never mutate the raw input string used for output.
-- Use exact UTF-8 text from the source for every entity `text` value.
-- Store offsets as `[start, end]` with an end-exclusive boundary.
-- Require `raw_text[start:end] == entity["text"]` for every serialized entity.
-- Preserve line endings and leading spaces because rendered HTML can collapse offset-significant whitespace.
+- Use exact UTF-8 source text for every entity `text` value.
+- Generate `[start, end]` offsets satisfying `raw_text[start:end] == entity["text"]` locally.
+- Treat end-exclusive semantics and exact position matching as strong evidence, not disclosed evaluator behavior.
+- Preserve line endings and whitespace and keep normalized text separately mapped to raw indices.
+- Do not simulate CRLF offsets outside a controlled one-variable experiment.
 
-### Mention identity
+### Mention identity and fields
 
-- Emit separate objects for separate occurrences even when surface text and concept are identical.
-- Do not deduplicate `táo bón`, `lo âu`, or any other repeated mention across positions.
+- Preserve separate occurrences even when surface text and concepts are identical.
+- The observed `THUỐC` schema has `text`, `type`, `candidates`, `assertions`, and `position`.
+- The observed `TRIỆU_CHỨNG` schema has no `candidates` field.
+- Do not add unapproved fields.
+- Treat schemas for diagnosis and both laboratory types as unresolved.
 
-### Observed entity fields
+### Drug spans and ontology safety
 
-- A `THUỐC` object in the official example has `text`, `type`, `candidates`, `assertions`, and `position`.
-- A `TRIỆU_CHỨNG` object in the official example has `text`, `type`, `assertions`, and `position` and does not have `candidates`.
-- Do not add `relations` or any other unapproved output field.
-- Treat schemas for `CHẨN_ĐOÁN`, `TÊN_XÉT_NGHIỆM`, and `KẾT_QUẢ_XÉT_NGHIỆM` as unresolved.
-
-### Drug spans
-
-- Include the medication name and the contiguous regimen text shown in the official examples, including strength, dose form, route, frequency, and PRN markers when present.
-- Exclude a following indication introduced by constructions such as `điều trị` when the official examples separate it into another mention.
-- Keep the full raw medication span even when ontology normalization uses only some parsed attributes.
-
-### Ontology safety
-
-- Treat organizer example identifiers as opaque until the ontology is verified.
-- Never invent an ICD or RxNorm code.
-- Emit only identifiers found in an approved local snapshot with recorded provenance and checksum.
+- Keep contiguous raw medication regimen text shown by official examples.
+- Exclude following indications when official examples separate them.
+- Treat example identifiers as opaque until the ontology is verified.
+- Never emit a code absent from an approved local snapshot.
 
 ## Provisional rules
 
-### Section-aware type priors
+### Section and assertion context
 
-- Prefer `CHẨN_ĐOÁN` in confirmed diagnosis, chronic disease, and diagnostic finding sections.
-- Prefer `TRIỆU_CHỨNG` in current symptom and admission-reason sections.
-- Do not let section prior override a clear local construction without evaluation evidence.
-
-### Historical status
-
+- Use diagnosis and symptom sections as priors, not absolute type rules.
 - Treat past medical, surgical, and pre-admission medication sections as historical priors.
-- Do not mark history-of-present-illness sections historical by header alone.
-- Let explicit local temporal cues override weak section priors.
-
-### Negation scope
-
-- Apply negation within a clause rather than across an entire line or section.
-- Terminate scope at sentence boundaries, section boundaries, list-item boundaries, semicolons, and contrast markers such as `nhưng` or `tuy nhiên`.
-- Keep trigger, pseudo-trigger, and terminator lexicons versioned and testable.
-
-### Family status
-
+- Do not mark current-illness sections historical by header alone.
+- Scope negation to clauses and terminate at sentence, section, list, semicolon, and contrast boundaries.
 - Track family reporter separately from family experiencer.
-- Set the internal family-experiencer state only when the condition belongs to a relative.
-- Do not set family merely because a relative reports the patient's condition.
 
 ### Candidate sets
 
-- Use top one as the conservative default until multi-code evidence exists.
-- Add another candidate only when calibrated expected Jaccard improves.
-- Calibrate thresholds separately by entity type and ontology granularity.
+- Use top one until multi-code evidence supports broader sets.
+- Add candidates only when calibrated expected Jaccard improves.
+- Calibrate separately by type and ontology granularity.
+
+## External data
+
+- Map every source label explicitly into competition types before training.
+- Use external data mainly for adaptation and span detection.
+- Competition context, sections, examples, and schema override source-dataset policy.
 
 ## Review triggers
 
-Revise this policy when the organizer publishes a new example, ontology snapshot, evaluator clarification, forum ruling, or reproducible leaderboard result that falsifies a provisional rule.
-Record the source, access date, affected rule, and expected prediction diff with every revision.
+Revise this policy when organizer evidence, ontology snapshots, evaluator clarification, or reproducible submissions falsify a rule.
