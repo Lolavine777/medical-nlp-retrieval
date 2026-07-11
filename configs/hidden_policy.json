@@ -1,0 +1,32 @@
+{
+  "rxnorm": {
+    "status_scope": {
+      "selected": "active_plus_historical",
+      "allowed": ["active_only", "active_plus_historical"]
+    },
+    "concept_level": {
+      "selected": "all_retrievable",
+      "allowed": ["ingredient", "clinical_drug", "branded_drug", "all_retrievable"]
+    },
+    "combination_policy": {
+      "selected": "combination_and_components_retrievable",
+      "allowed": ["combination_only", "components_only", "combination_and_components_retrievable"]
+    },
+    "replacement_policy": {
+      "selected": "preserve_historical_identifier",
+      "allowed": ["preserve_historical_identifier", "prefer_current_replacement"]
+    },
+    "candidate_output": {
+      "selected": "top1",
+      "allowed": ["top1", "top2", "thresholded"]
+    }
+  },
+  "span_policy": {
+    "selected": "competition_example_compatible",
+    "allowed": ["core", "modifier_inclusive", "competition_example_compatible"]
+  },
+  "position_strategy": {
+    "selected": "raw_lf",
+    "allowed": ["raw_lf", "simulated_crlf"]
+  }
+}
