@@ -6,7 +6,7 @@ from medical_race.offsets import validate_entity_offset
 from medical_race.sections import parse_sections
 
 
-BOUNDARY = re.compile(r"(?i)[.;!?]|\b(?:nhưng|tuy nhiên)\b")
+BOUNDARY = re.compile(r"(?i)[,.;!?]|\b(?:nhưng|tuy nhiên)\b")
 NEGATION_BEFORE = re.compile(r"(?i)\b(?:không|chưa|phủ nhận|không có|không ghi nhận)\b")
 NEGATION_AFTER = re.compile(r"(?i)\bâm tính\b")
 HISTORICAL = re.compile(
