@@ -1,0 +1,14 @@
+{
+  "budget_limit_parameters": 9000000000,
+  "configurations": [
+    {
+      "id": "stable_rule_baseline",
+      "status": "stable",
+      "active_model_ids": [],
+      "combined_parameters": 0,
+      "compliant": true,
+      "unused_checkpoints_included": false,
+      "evidence": "Rule-only baseline; no model checkpoints are active."
+    }
+  ]
+}

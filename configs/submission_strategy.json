@@ -1,0 +1,19 @@
+{
+  "guaranteed_submissions_per_day": 5,
+  "bonus_team_members": 2,
+  "bonus_submissions_per_member_per_day": 5,
+  "maximum_bonus_submissions_per_day": 10,
+  "bonus_capacity_is_required": false,
+  "stable_pipeline_config": "stable_rule_baseline",
+  "guaranteed_capacity_usage": [
+    "high_confidence_improvement",
+    "high_information_experiment"
+  ],
+  "bonus_capacity_usage": [
+    "model_branch",
+    "ontology_branch",
+    "threshold_branch",
+    "span_branch",
+    "evaluator_policy_branch"
+  ]
+}

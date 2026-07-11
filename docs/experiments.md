@@ -1,48 +1,34 @@
 # Experiment and Leaderboard Ledger
 
-Leaderboard submissions are a limited experimental feedback loop, not an optimization oracle.
-Every submission must test a documented hypothesis from a reproducible commit and configuration.
-Prefer changing only one primary variable.
-Public-test-specific hard-coding is prohibited.
+Use the leaderboard as a limited experimental feedback loop.
+Plan around five guaranteed daily submissions and treat up to ten legitimate team-member submissions as bonus exploration capacity.
 
-## Required submission record
+## Stable pipeline rule
 
-Copy this template before generating a submission.
-
-```markdown
-### Submission identifier
-
-- Date and time:
-- Commit:
-- Configuration:
-- Hypothesis:
-- Baseline submission:
-- Primary variable changed:
-- Expected prediction effect:
-- Prediction diff summary:
-- Files changed in prediction:
-- Entity additions:
-- Entity removals:
-- Type changes:
-- Assertion changes:
-- Candidate changes:
-- Public score before:
-- Public score after:
-- Score delta:
-- Conclusion:
-- Next decision:
-```
+Maintain one stable pipeline with configurable policies.
+Exploratory work changes configuration or isolated components rather than creating unrelated codebases.
 
 ## Submission gate
 
-- Reject a submission without a hypothesis, commit, and saved configuration.
-- Reject a submission that bundles unrelated primary changes unless it is an explicitly documented integration test.
-- Generate and inspect a semantic prediction diff before submission.
-- Record a null or negative score result with the same care as a positive result.
-- Do not repeat a failed hypothesis without new evidence.
+- Require commit, config, output checksum, parent submission, and hypothesis.
+- Prefer one primary change.
+- Inspect a semantic prediction diff before submission.
+- Record changed entities, candidates, assertions, score delta, conclusion, confidence, and generalization class.
+- Record null and negative results.
+- Never hard-code public-test data or evade submission limits.
 
-## Quota monitoring
+## Capacity usage
 
-The observation that quotas may apply per team member rather than per team is unconfirmed.
-Monitor organizer clarification and plan under the conservative visible quota.
-Do not make quota interpretation a core architectural assumption.
+- Guaranteed capacity: high-confidence improvements and high-information uncertainty reduction.
+- Bonus capacity: model, ontology, threshold, span, and evaluator-policy branches.
+- Bonus capacity must never become a dependency of the baseline plan.
+
+## Promotion gate
+
+Promote an exploratory result only when it is reproducible from its commit and config, interpretable from its prediction diff, and plausibly generalizable to the private test.
+Classify results as `generalizable`, `public-specific-risk`, or `unknown`.
+
+## Model gate
+
+Every active pipeline declares its model subset and parameter report in `configs/model_configurations.json`.
+The combined count must not exceed 9B and final artifacts must exclude unused checkpoints.

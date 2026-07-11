@@ -1,13 +1,20 @@
 # Model Parameter Budget
 
-The organizer confirmed that the combined parameter count of all models in the solution must not exceed 9B.
-Count independent ensemble checkpoints separately and do not treat quantization as reducing parameter count.
+The organizer-confirmed combined limit is 9B parameters across the active model subset.
+Independent checkpoints count separately and quantization does not reduce parameter count.
 
-The current budget is 0 of 9,000,000,000 parameters.
-Update this file and `configs/model_budget.json` before adding any model.
+Current model configurations and their parameter reports live in `configs/model_configurations.json`.
+The stable rule baseline uses 0 of 9,000,000,000 parameters.
 
-| Model | Purpose | Base parameters | Adapter parameters | Shared weights | Counted parameters | Running total |
-|---|---|---:|---:|---|---:|---:|
-| None | Rule baseline | 0 | 0 | Not applicable | 0 | 0 |
+## Required report fields
 
-Use conservative accounting until the organizer clarifies whether synthetic-data generators, distillation teachers, ontology-embedding models, LoRA adapters, and merged checkpoints count.
+Every configuration records:
+
+- Configuration identifier and status.
+- Active model identifiers only.
+- Combined parameter count and compliance result.
+- Shared-weight accounting evidence.
+- Confirmation that unused checkpoints are excluded.
+
+Reject a configuration that exceeds 9B, lacks a report, or includes unused checkpoints.
+Count generators, teachers, ontology embedders, LoRA, and merged checkpoints conservatively until organizer accounting is known.
