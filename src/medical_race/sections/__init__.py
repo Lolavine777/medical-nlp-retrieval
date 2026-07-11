@@ -3,8 +3,20 @@ from dataclasses import dataclass
 
 
 HEADERS = (
+    ("Thuốc đã điều trị trước khi nhập viện lần này", "medications"),
     ("Thuốc trước khi nhập viện lần này", "medications"),
+    ("Thuốc đang dùng trước khi nhập viện", "medications"),
+    ("Thuốc dùng trước khi nhập viện", "medications"),
     ("Thuốc trước khi nhập viện", "medications"),
+    ("Thuốc đang điều trị theo đơn", "medications"),
+    ("Thuốc đã dùng trước đây", "medications"),
+    ("Kết quả chẩn đoán hình ảnh", "imaging"),
+    ("Kết quả xét nghiệm xét nghiệm", "laboratory"),
+    ("Kết quả xét nghiệm máu", "laboratory"),
+    ("Kết quả xét nghiệm", "laboratory"),
+    ("xét nghiệm Kết quả", "laboratory"),
+    ("Các yếu tố nguy cơ liên quan", "risk_factors"),
+    ("Tiền sử bệnh bệnh hiện tại", "current_illness"),
     ("Tiền sử bệnh hiện tại", "current_illness"),
     ("Tiền sử bệnh nội khoa", "past_history"),
     ("Phát hiện chẩn đoán", "diagnosis"),
