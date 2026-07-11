@@ -1,6 +1,8 @@
 # Ontology Policy
 
-Place organizer-approved ICD and RxNorm snapshots under `ontologies/icd/` and `ontologies/rxnorm/` only after recording their source, version, license, checksum, and acquisition date.
-Do not emit a code that is absent from the pinned local snapshot.
+Store legally usable ICD and RxNorm snapshots under `ontologies/icd/` and `ontologies/rxnorm/` with source, version, license, checksum, and acquisition date.
+Never emit a code absent from a pinned local snapshot.
 
-The exact competition ICD namespace, RxNorm release, and RxNorm target term type are currently unresolved.
+For RxNorm, retain active and historical concepts plus replacement relationships when legally available.
+Keep active status, term type, branded or generic level, combination or component behavior, and candidate-output policy configurable.
+Never assume the newest replacement RXCUI is the evaluator target.

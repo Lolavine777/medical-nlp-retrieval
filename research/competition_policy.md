@@ -3,25 +3,23 @@
 ## Organizer-confirmed
 
 - Combined model parameters must be at most 9B.
-- Public Vietnamese medical NER and other external training data are allowed, subject to license, provenance, reproducibility, and redistribution requirements.
-- Position was designed to help locate a genuine concept, but detailed evaluator matching will not be disclosed.
+- Licensed public Vietnamese medical NER and other external training data are allowed with provenance and reproducibility.
+- Position helps locate genuine concepts, but detailed matching is hidden.
+- Medical standards, recognition policy, span boundaries, candidate behavior, and position matching are intentional challenge variables and will not be clarified further.
 
 ## Strong evidence, not confirmed evaluator behavior
 
-- The official example supports `end - start == len(text)` and reconstructed spans satisfy `raw_text[start:end] == text` for all 19 entities.
-- Website offset drift grows by about two characters per numbered item, consistent with hidden multiline serialization or different line endings.
-- Preserve raw UTF-8 text and original line endings, keep normalized text separate, and do not convert LF offsets to CRLF outside a controlled experiment.
+- Reconstructed example spans satisfy `raw_text[start:end] == text` for all 19 entities.
+- Website offset drift is consistent with hidden multiline serialization or different line endings.
+- Example drug identifiers appear to include obsolete, retired, or currently inconsistent RxNorm mappings.
 
-## Unconfirmed
+## Operational policy
 
-- Matching may use text and type, duplicate disambiguation, nearest position, tolerant search, overlap, or assignment.
-- The five-submission daily quota may apply per member rather than per team.
-- Auxiliary model accounting for generation, distillation, ontology embeddings, and LoRA remains unclear.
+- Preserve raw text and line endings and keep normalized text separately mapped.
+- Do not restrict RxNorm retrieval to active RXCUIs or automatically replace historical identifiers with current successors.
+- Keep active, historical, ingredient, clinical-drug, branded-drug, combination, and component hypotheses configurable.
+- Probe active-only versus active-plus-historical, ontology granularity, combination versus components, core versus modifier-inclusive spans, and position strategies one variable at a time.
+- Record prediction diff, score delta, conclusion, confidence, and generalization classification for every submission.
+- Never hard-code public-test data or continue requesting clarification for declared hidden policies.
 
-## Strategy
-
-- Optimize for private-test generalization.
-- Use each submission to test one documented hypothesis from a reproducible commit and configuration.
-- Record prediction diff, score delta, conclusion, confidence, and `generalizable`, `public-specific-risk`, or `unknown` classification.
-- Probe raw LF versus simulated CRLF positions only after all non-position predictions are identical.
-- Never hard-code public-test files, text, positions, candidates, or entities.
+Submission quota scope and auxiliary-model accounting remain unconfirmed.
