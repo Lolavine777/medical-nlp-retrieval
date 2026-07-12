@@ -1,0 +1,6 @@
+{
+  "include_labs": false,
+  "span_policy": "regimen",
+  "concept_level": "all_retrievable",
+  "candidate_output": "top1"
+}
