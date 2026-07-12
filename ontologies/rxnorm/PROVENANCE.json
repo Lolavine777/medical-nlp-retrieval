@@ -1,0 +1,21 @@
+{
+  "name": "RxNorm Current Prescribable Content",
+  "release_date": "2026-07-06",
+  "accessed": "2026-07-12",
+  "archive": "RxNorm_full_prescribe_07062026.zip",
+  "url": "https://download.nlm.nih.gov/rxnorm/RxNorm_full_prescribe_07062026.zip",
+  "published_md5": "767678e3b5b1d6fe358b61c21659f3ef",
+  "sha256": "e81e29a27575718dc1f0cf80b1371b283bcba53f446f27fc85f74c71def99829",
+  "license_required": false,
+  "redistribution_status": "Do not redistribute the raw archive from this repository; reproduce it from the official dated URL.",
+  "runtime_network_required": false,
+  "used_member": "rrf/RXNCONSO.RRF",
+  "included_sources": ["RXNORM", "MTHSPL"],
+  "excluded_sources": ["MTHCMSFRF"],
+  "filters": ["LAT=ENG", "SUPPRESS=N", "non-empty numeric RXCUI", "non-empty term"],
+  "known_limitations": [
+    "The subset contains active prescribable content and excludes obsolete and historical concepts.",
+    "The competition RxNorm release and target term-type policy are hidden."
+  ],
+  "attribution": "This product uses publicly available data courtesy of the U.S. National Library of Medicine (NLM), National Institutes of Health, Department of Health and Human Services; NLM is not responsible for the product and does not endorse or recommend any product."
+}
