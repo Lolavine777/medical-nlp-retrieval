@@ -8,6 +8,13 @@ from pathlib import Path
 
 from medical_race.assertions import classify_assertions
 from medical_race.extraction import Span
+from medical_race.extraction.labs import NUMERIC, QUALITATIVE
+from medical_race.extraction.symptoms import (
+    CURRENT_HEADINGS,
+    LEADING_CUE,
+    NORMAL_STATE,
+    REJECT_PREFIXES,
+)
 from medical_race.line_roles import parse_line_roles
 from medical_race.linking.icd10 import ICD10Term, is_diagnosis_code, link_diagnosis
 from medical_race.linking.rxnorm import RxNormTerm, link_drug
@@ -212,6 +219,9 @@ def accept_model_proposals(
         if value.role in {"header", "blank"} or value.section not in TYPE_SECTIONS[value.entity_type]:
             rejected["invalid_section"] += 1
             continue
+        if not _valid_model_structure(value):
+            rejected["invalid_structure"] += 1
+            continue
         if any(_overlaps(value.span.start, value.span.end, start, end) for start, end in stable_spans):
             rejected["stable_overlap"] += 1
             continue
@@ -253,6 +263,46 @@ def accept_model_proposals(
         entities.append(entity)
         rejected["accepted"] += 1
     return ModelMergeResult(tuple(entities), dict(sorted(rejected.items())))
+
+
+def _valid_model_structure(value: GroundedProposal) -> bool:
+    text = value.span.text
+    folded = " ".join(text.casefold().split())
+    words = len(text.split())
+    if (
+        text != text.strip(" \t")
+        or text.lstrip().startswith(("-", "*"))
+        or text.rstrip().endswith((".", ";"))
+    ):
+        return False
+    if value.entity_type == "TRIỆU_CHỨNG":
+        return (
+            words <= 8
+            and len(text) <= 60
+            and not any(mark in text for mark in ":;,")
+            and folded not in CURRENT_HEADINGS
+            and not folded.startswith("các triệu chứng")
+            and not folded.startswith(REJECT_PREFIXES)
+            and LEADING_CUE.match(text) is None
+            and NORMAL_STATE.search(text) is None
+        )
+    if value.entity_type == "KẾT_QUẢ_XÉT_NGHIỆM":
+        return (
+            words <= 5
+            and len(text) <= 40
+            and ":" not in text
+            and (NUMERIC.search(text) is not None or QUALITATIVE.search(text) is not None)
+        )
+    if value.entity_type == "TÊN_XÉT_NGHIỆM":
+        return words <= 6 and len(text) <= 40 and ":" not in text
+    if value.entity_type == "THUỐC":
+        return (
+            words <= 8
+            and len(text) <= 60
+            and ":" not in text
+            and not folded.startswith(("được ", "đã ", "tự "))
+        )
+    return True
 
 
 def _build_entity(

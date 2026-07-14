@@ -23,7 +23,7 @@ Run from the unpacked repository root:
 
 ```bash
 pip install -r requirements-model.txt
-export PYTHONPATH=src
+export PYTHONPATH=.:src
 python tools/generate_model_proposals.py \
   --input input.zip \
   --output /kaggle/working/qwen3-4b-s008
