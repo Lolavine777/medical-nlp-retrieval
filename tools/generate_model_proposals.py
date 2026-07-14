@@ -194,6 +194,7 @@ def main() -> None:
     parser.add_argument("--max-chars", type=int, default=6000)
     args = parser.parse_args()
 
+    print(json.dumps(_manifest(), sort_keys=True))
     documents = read_zip_documents(args.input)
     validate_document_names(list(documents))
     generate_proposal_directory(

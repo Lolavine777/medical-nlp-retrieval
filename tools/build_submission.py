@@ -7,6 +7,7 @@ from pathlib import Path
 from medical_race.extraction.drugs import extract_drugs
 from medical_race.linking.icd10 import build_term_index, read_icd10_snapshot
 from medical_race.linking.rxnorm import read_rxnorm_archive
+from medical_race.model_proposals import read_proposal_directory, read_proposal_manifest
 from medical_race.pipeline import load_submission_config, predict_document
 from medical_race.submission import build_output_zip
 from tools.audit_sources import read_zip_documents, sha256, validate_document_names
@@ -25,6 +26,7 @@ def build_submission(
     expected_md5: str = PUBLISHED_RXNORM_MD5,
     icd_path: Path = DEFAULT_ICD10_PATH,
     expected_icd_sha256: str = PINNED_ICD10_SHA256,
+    model_proposals_path: Path | None = None,
 ) -> dict[str, object]:
     input_zip = Path(input_zip)
     rxnorm_zip = Path(rxnorm_zip)
@@ -38,13 +40,36 @@ def build_submission(
     icd_ontology_sha256 = sha256(icd_path) if config.include_diagnoses else None
     documents = read_zip_documents(input_zip)
     validate_document_names(list(documents))
+
+    model_proposals = {}
+    model_manifest = None
+    model_parse_error_count = 0
+    if config.include_model_proposals:
+        if model_proposals_path is None:
+            raise ValueError("model proposal directory is required when proposals are enabled")
+        model_proposals_path = Path(model_proposals_path)
+        model_proposals = read_proposal_directory(model_proposals_path, documents)
+        model_manifest = read_proposal_manifest(model_proposals_path)
+        model_parse_error_count = _proposal_parse_error_count(
+            model_proposals_path,
+            documents,
+        )
+
     terms = read_rxnorm_archive(rxnorm_zip, expected_md5)
     icd_index = None
     if config.include_diagnoses:
         icd_terms = read_icd10_snapshot(icd_path, expected_icd_sha256)
         icd_index = build_term_index(icd_terms)
+    model_report = Counter()
     predictions = {
-        name: predict_document(raw_text, terms, config, icd_index)
+        name: predict_document(
+            raw_text,
+            terms,
+            config,
+            icd_index,
+            model_proposals=model_proposals.get(name, ()),
+            model_report=model_report,
+        )
         for name, raw_text in documents.items()
     }
     package = build_output_zip(documents, predictions, destination)
@@ -82,7 +107,39 @@ def build_submission(
                 "candidate_counts_by_type": dict(sorted(candidate_counts.items())),
             }
         )
+    if config.include_model_proposals:
+        report.update(
+            {
+                "model_id": model_manifest["model_id"],
+                "model_revision": model_manifest["model_revision"],
+                "model_parameters": model_manifest["model_parameters"],
+                "prompt_sha256": model_manifest["prompt_sha256"],
+                "model_proposal_count": sum(
+                    len(values) for values in model_proposals.values()
+                ),
+                "model_added_entity_count": model_report["accepted"],
+                "model_parse_error_count": model_parse_error_count,
+                "model_rejections": dict(
+                    sorted(
+                        (key, value)
+                        for key, value in model_report.items()
+                        if key != "accepted"
+                    )
+                ),
+            }
+        )
     return report
+
+
+def _proposal_parse_error_count(root: Path, documents: dict[str, str]) -> int:
+    return sum(
+        json.loads(
+            (root / "documents" / f"{Path(name).stem}.json").read_text(
+                encoding="utf-8"
+            )
+        )["parse_error_count"]
+        for name in documents
+    )
 
 
 def _console_json(value: object) -> str:
@@ -105,6 +162,7 @@ def main() -> None:
     )
     parser.add_argument("--icd", type=Path, default=DEFAULT_ICD10_PATH)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--model-proposals", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--report", type=Path)
     parser.add_argument("--expected-md5", default=PUBLISHED_RXNORM_MD5)
@@ -118,6 +176,7 @@ def main() -> None:
         args.expected_md5,
         args.icd,
         args.expected_icd_sha256,
+        model_proposals_path=args.model_proposals,
     )
     report_path = args.report or args.output.with_suffix(".report.json")
     with report_path.open("x", encoding="utf-8") as output:
