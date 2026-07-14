@@ -39,6 +39,40 @@ class SymptomExtractionTest(unittest.TestCase):
         self.assertEqual([span.text for span in spans], ["ho", "ho"])
         self.assertNotEqual(spans[0].start, spans[1].start)
 
+    def test_stops_at_plural_event_heading(self):
+        raw = "Triệu chứng hiện tại\n- ho\nCác diễn biến trước khi nhập viện\n- sốt"
+        self.assertEqual([span.text for span in extract_symptoms(raw)], ["ho"])
+
+    def test_rejects_normal_metadata_procedure_and_followup_bullets(self):
+        rejected = (
+            "khỏe khi thức dậy",
+            "Lan đến vai trái",
+            "Dẫn lưu dịch",
+            "x-quang đề nghị mri",
+            "Cần tái khám",
+            "Thủ thuật đã thực hiện",
+            "Đến khám theo hẹn",
+            "Tái khám để đánh giá",
+            "Sử dụng thiết bị hỗ trợ",
+            "Theo dõi sau phẫu thuật",
+            "Tuột ống dẫn lưu",
+            "Cả hai lần đều ngắn",
+        )
+        raw = "Triệu chứng hiện tại\n" + "".join(f"- {text}\n" for text in rejected) + "- ho"
+        self.assertEqual([span.text for span in extract_symptoms(raw)], ["ho"])
+
+    def test_strips_stacked_assertion_and_reporter_cues(self):
+        raw = (
+            "Triệu chứng hiện tại\n"
+            "- Không ghi nhận sốt\n"
+            "- Phủ nhận tiểu máu\n"
+            "- Không có biểu hiện động kinh"
+        )
+        self.assertEqual(
+            [span.text for span in extract_symptoms(raw)],
+            ["sốt", "tiểu máu", "động kinh"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

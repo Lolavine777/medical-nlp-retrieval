@@ -14,6 +14,7 @@ CURRENT_HEADINGS = {
 STOP_PREFIXES = (
     "đặc điểm triệu chứng",
     "các sự kiện trước khi nhập viện",
+    "các diễn biến trước khi nhập viện",
     "thời điểm khởi phát",
     "diễn biến",
     "đánh giá",
@@ -30,6 +31,18 @@ REJECT_PREFIXES = (
     "chiếu xạ",
     "các yếu tố",
     "có triệu chứng",
+    "lý do khám",
+    "lan đến",
+    "dẫn lưu",
+    "x-quang",
+    "cần ",
+    "thủ thuật",
+    "đến khám",
+    "tái khám",
+    "sử dụng",
+    "theo dõi",
+    "tuột ",
+    "cả hai lần",
     "được ",
     "đã ",
     "sau đó",
@@ -44,11 +57,12 @@ REJECT_PREFIXES = (
     "tỉnh dậy",
 )
 LEADING_CUE = re.compile(
-    r"(?i)(?:(?:không|chưa|không còn)\s+|"
+    r"(?i)(?:(?:không|chưa|không còn|phủ nhận)\s+|"
     r"bệnh nhân\s+(?:có|bị|cảm thấy)\s+|"
-    r"(?:cảm thấy|cảm giác)\s+)"
+    r"(?:cảm thấy|cảm giác|ghi nhận|có biểu hiện)\s+)"
 )
 PARENTHETICAL = re.compile(r"\s*\([^()]*\)\s*$")
+NORMAL_STATE = re.compile(r"(?i)\b(?:bình thường|khỏe)\b")
 
 
 def extract_symptoms(raw_text: str) -> tuple[Span, ...]:
@@ -100,8 +114,10 @@ def _candidate_span(raw_text: str, line_start: int, line_end: int) -> Span | Non
         end -= 1
     if end - start >= 2 and raw_text[end - 2 : end] == "**":
         end -= 2
-    cue = LEADING_CUE.match(raw_text[start:end])
-    if cue:
+    while True:
+        cue = LEADING_CUE.match(raw_text[start:end])
+        if cue is None:
+            break
         start += cue.end()
     parenthetical = PARENTHETICAL.search(raw_text[start:end])
     if parenthetical:
@@ -110,7 +126,7 @@ def _candidate_span(raw_text: str, line_start: int, line_end: int) -> Span | Non
         end -= 1
     text = raw_text[start:end]
     folded = text.casefold()
-    if not text or len(text.split()) > 8 or ":" in text:
+    if not text or len(text.split()) > 8 or ":" in text or NORMAL_STATE.search(text):
         return None
     if folded in {"n/a", "na", "không có triệu chứng"} or folded.startswith(REJECT_PREFIXES):
         return None
