@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.worktrees/
 outputs/*
 data/external/*
 data/processed/*
