@@ -39,8 +39,8 @@ class SymptomExtractionTest(unittest.TestCase):
         self.assertEqual([span.text for span in spans], ["ho", "ho"])
         self.assertNotEqual(spans[0].start, spans[1].start)
 
-    def test_stops_at_plural_event_heading(self):
-        raw = "Triệu chứng hiện tại\n- ho\nCác diễn biến trước khi nhập viện\n- sốt"
+    def test_stops_at_irregularly_spaced_plural_event_heading(self):
+        raw = "Triệu chứng hiện tại\n- ho\n  Các diễn biến  trước khi nhập viện\n- sốt"
         self.assertEqual([span.text for span in extract_symptoms(raw)], ["ho"])
 
     def test_rejects_normal_metadata_procedure_and_followup_bullets(self):
@@ -57,6 +57,7 @@ class SymptomExtractionTest(unittest.TestCase):
             "Theo dõi sau phẫu thuật",
             "Tuột ống dẫn lưu",
             "Cả hai lần đều ngắn",
+            "Có lý do khám bệnh chính",
         )
         raw = "Triệu chứng hiện tại\n" + "".join(f"- {text}\n" for text in rejected) + "- ho"
         self.assertEqual([span.text for span in extract_symptoms(raw)], ["ho"])

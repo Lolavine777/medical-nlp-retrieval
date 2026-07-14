@@ -31,6 +31,7 @@ REJECT_PREFIXES = (
     "chiếu xạ",
     "các yếu tố",
     "có triệu chứng",
+    "có lý do",
     "lý do khám",
     "lan đến",
     "dẫn lưu",
@@ -78,7 +79,7 @@ def extract_symptoms(raw_text: str) -> tuple[Span, ...]:
             line_end = position + len(full_line.rstrip("\r\n"))
             line = raw_text[position:line_end]
             stripped = line.strip()
-            folded = stripped.casefold().strip(" :*")
+            folded = " ".join(stripped.casefold().strip(" :*").split())
             if folded in CURRENT_HEADINGS:
                 active = True
                 first_content = False
