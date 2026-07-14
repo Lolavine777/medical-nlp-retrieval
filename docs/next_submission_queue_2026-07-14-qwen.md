@@ -30,3 +30,16 @@ The complete addition audit is stored in `outputs/submissions/07_add_diagnoses_t
 The hypothesis is that grounded Qwen proposals recover short symptom mentions missed by the stable structural extractor without degrading existing entities.
 Promote this configuration only if the portal gain is interpretable against Submission 7 and is plausibly private-test generalizable.
 Reject or revise it if the added symptoms reduce the overall score or produce a mixed component loss inconsistent with improved mention coverage.
+
+## Portal result
+
+The portal scored Submission 8 at `16.13250` on 14 July 2026 at 20:54 Asia/Bangkok.
+The score increased by `0.26870` over Submission 7.
+WER improved from `85.1012` to `84.6803`, a reduction of `0.4209`.
+Assertion Jaccard improved from `16.4583` to `16.933`, an increase of `0.4747`.
+Candidate Jaccard remained exactly `16.1416`.
+All 100 records were scored.
+
+The gain is isolated to the intended grounded symptom additions and has no candidate regression.
+Submission 8 is promoted as the new stable baseline.
+The next model iteration should target output-format reliability and two-GPU document parallelism before another full inference run.
