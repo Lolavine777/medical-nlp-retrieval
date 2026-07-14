@@ -8,4 +8,5 @@ data/processed/*
 data/synthetic/*
 ontologies/icd/*
 ontologies/rxnorm/*
+!ontologies/icd/PROVENANCE.json
 !ontologies/rxnorm/PROVENANCE.json

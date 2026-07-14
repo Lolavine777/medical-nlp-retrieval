@@ -1,0 +1,22 @@
+{
+  "acquired_at": "2026-07-14",
+  "acquisition_command": ".\\.venv\\Scripts\\python.exe tools\\fetch_icd10_vn.py --workers 8 --output ontologies\\icd\\icd10_vn_2020.json",
+  "catalog_branch": "ICD10",
+  "format": "canonical UTF-8 JSON produced by tools/fetch_icd10_vn.py",
+  "indexed_title_count": 13906,
+  "language": "vi",
+  "leaf_node_count": 13940,
+  "license": {
+    "redistribution": "Raw snapshot is untracked, not bundled, and must not be redistributed unless a license is established.",
+    "status": "No explicit redistribution license was located on the public application.",
+    "use": "Internal competition use as public official reference data."
+  },
+  "name": "Vietnamese national ICD-10 catalog",
+  "node_count": 15827,
+  "raw_path": "ontologies/icd/icd10_vn_2020.json",
+  "sha256": "72b81f78e3fb971c2c44250d3a5ae67f7c41bef3b5bf1ded59954250e479212f",
+  "source_api": "https://ccs.whiteneuron.com/api/ICD10/",
+  "source_page": "https://icd.kcb.vn/ICD-10-VN",
+  "version_basis": "Associated with the national catalog issued under Decision 4469/QD-BYT dated 2020-10-28.",
+  "version_basis_status": "Evidence-backed inference because the public API does not expose a release identifier in its payload."
+}

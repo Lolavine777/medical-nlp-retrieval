@@ -5,15 +5,17 @@ from pathlib import Path
 
 from medical_race.assertions import classify_assertions
 from medical_race.extraction import Span
+from medical_race.extraction.diagnoses import extract_diagnoses
 from medical_race.extraction.drugs import extract_drugs
 from medical_race.extraction.labs import extract_labs
 from medical_race.extraction.symptoms import extract_symptoms
+from medical_race.linking.icd10 import ICD10Term
 from medical_race.linking.rxnorm import RxNormTerm, link_drug
 from medical_race.output import validate_entities
 
 
 REQUIRED_CONFIG_FIELDS = {"include_labs", "span_policy", "concept_level", "candidate_output"}
-OPTIONAL_CONFIG_FIELDS = {"include_symptoms"}
+OPTIONAL_CONFIG_FIELDS = {"include_symptoms", "include_diagnoses"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,12 +25,15 @@ class SubmissionConfig:
     concept_level: str
     candidate_output: str
     include_symptoms: bool = False
+    include_diagnoses: bool = False
 
     def __post_init__(self):
         if type(self.include_labs) is not bool:
             raise ValueError("include_labs must be boolean")
         if type(self.include_symptoms) is not bool:
             raise ValueError("include_symptoms must be boolean")
+        if type(self.include_diagnoses) is not bool:
+            raise ValueError("include_diagnoses must be boolean")
         if self.span_policy not in {"regimen", "core"}:
             raise ValueError(f"unknown span policy: {self.span_policy!r}")
         if self.concept_level not in {"all_retrievable", "ingredient"}:
@@ -49,6 +54,7 @@ def load_submission_config(path: Path) -> SubmissionConfig:
             f"and only use {sorted(allowed)}"
         )
     values.setdefault("include_symptoms", False)
+    values.setdefault("include_diagnoses", False)
     return SubmissionConfig(**values)
 
 
@@ -56,7 +62,10 @@ def predict_document(
     raw_text: str,
     terms: tuple[RxNormTerm, ...],
     config: SubmissionConfig,
+    icd_index: dict[str, ICD10Term] | None = None,
 ) -> list[dict[str, object]]:
+    if config.include_diagnoses and icd_index is None:
+        raise ValueError("verified ICD-10 term index is required when diagnoses are enabled")
     entities = []
     for extracted in extract_drugs(raw_text):
         link = link_drug(
@@ -101,6 +110,18 @@ def predict_document(
                 {
                     "text": span.text,
                     "type": "TRIỆU_CHỨNG",
+                    "assertions": list(classify_assertions(raw_text, span).labels()),
+                    "position": [span.start, span.end],
+                }
+            )
+    if config.include_diagnoses:
+        for match in extract_diagnoses(raw_text, icd_index):
+            span = Span(match.text, match.start, match.end)
+            entities.append(
+                {
+                    "text": span.text,
+                    "type": "CHẨN_ĐOÁN",
+                    "candidates": [match.code],
                     "assertions": list(classify_assertions(raw_text, span).labels()),
                     "position": [span.start, span.end],
                 }
