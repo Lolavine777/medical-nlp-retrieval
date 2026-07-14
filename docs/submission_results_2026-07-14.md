@@ -49,3 +49,53 @@ The reported leading score is approximately `53`, leaving a public-score gap of 
 The remaining gap is too large for minor span or candidate-cardinality probes.
 The next primary milestone is high-precision diagnosis extraction backed by a pinned and documented ICD source.
 That milestone can improve text, assertion, and candidate components together and should be developed as a complete product capability before its leaderboard validation.
+
+## Submission 7: Add ontology-backed diagnoses
+
+- Local identifier: `local-s007` because the portal submission identifier was not shown in the supplied result.
+- Submitted: 2026-07-14 at 16:57 Asia/Bangkok.
+- Artifact: `outputs/submissions/07_add_diagnoses.zip`.
+- Artifact SHA-256: `f220956151b29cf60d9e7a94ab475b7bbe8b8a41276cb1b83872a733b5d06546`.
+- Config: `configs/submissions/07_add_diagnoses.json`.
+- Implementation commit: `135ce8159ed87821ded64d34bc4d27fd3a66545c`.
+- Parent: `local-s006`.
+- Final score: `15.86380`.
+- Score delta: `+6.00090`.
+- WER: `85.1012`.
+- Derived text score: `14.8988`.
+- Text score delta: `+3.6488`.
+- Assertion Jaccard: `16.4583`.
+- Assertion Jaccard delta: `+3.4135`.
+- Candidate Jaccard: `16.1416`.
+- Candidate Jaccard delta: `+9.7056`.
+- `num_scored`: `100`.
+- `num_records`: `100`.
+
+The displayed score is consistent with the documented weighting after rounding:
+
+```text
+0.3 * 14.8988 + 0.3 * 16.4583 + 0.4 * 16.1416 = 15.86377
+```
+
+The score delta decomposes as follows before portal rounding:
+
+```text
+0.3 * 3.6488 + 0.3 * 3.4135 + 0.4 * 9.7056 = 6.00093
+```
+
+## Interpretation
+
+Submission 7 adds 89 audited diagnosis entities and candidate occurrences without changing any Submission 6 prediction.
+The candidate component supplies `3.88224` of the total gain, confirming that diagnosis linking is the strongest new capability.
+The simultaneous text and assertion gains show that the added diagnoses match real mentions rather than merely exploiting candidate behavior.
+The isolated and interpretable improvement is plausibly generalizable to private data.
+
+Submission 7 is promoted as the new stable baseline.
+Future integrated submissions should derive from it unless a controlled result establishes a better generalizable parent.
+
+## Competitive position and next milestone
+
+The reported leading score is approximately `53`, leaving a public-score gap of `37.13620` from Submission 7.
+The completed rule baseline now covers all five required entity types.
+The next primary milestone is broader clinical mention recognition plus ontology retrieval and reranking, with Submission 7 retained as the precision-preserving fallback.
+This phase should target recall gaps and linking accuracy together rather than spend guaranteed submissions on marginal span probes.
