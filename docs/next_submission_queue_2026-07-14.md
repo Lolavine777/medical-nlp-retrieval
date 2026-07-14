@@ -1,8 +1,9 @@
 # Next Submission Queue - 2026-07-14
 
-## Recommended upload
+## Submission status
 
-Upload only `outputs/submissions/06_add_symptoms.zip`.
+`outputs/submissions/06_add_symptoms.zip` was uploaded on 2026-07-14 at 16:03 Asia/Bangkok and scored `9.86290`.
+It is now the promoted stable baseline.
 
 - Artifact SHA-256: `ea910695300e32bfa15082cc64c212c6566e063307342fc66dbdfb369bf888ed`.
 - Config: `configs/submissions/06_add_symptoms.json`.
@@ -10,16 +11,25 @@ Upload only `outputs/submissions/06_add_symptoms.zip`.
 - Implementation commit: `7a7c576df978ecd74d3cf7b44bf29272f6aa2ccb`.
 - Parent submission: `local-s002`.
 - Parent score: `5.00940`.
+- Score delta: `+4.85350`.
 - Input SHA-256: `46fe4a578b2c4478faa7c570b218218f539c0bbf1ea409168ae67a14ad86ca35`.
 - RxNorm SHA-256: `e81e29a27575718dc1f0cf80b1371b283bcba53f446f27fc85f74c71def99829`.
 - Active model budget: `0 / 9B`.
 
-## Controlled hypothesis
+## Portal result
 
-Conservative exact-offset symptom coverage from explicit chief-complaint and current-symptom structures improves the text and assertion components while all drug, laboratory, and candidate output remains fixed.
+- Final score: `9.86290`.
+- WER: `88.75`.
+- Derived text score: `11.25`.
+- Assertion Jaccard: `13.0448`.
+- Candidate Jaccard: `6.436`.
+- `num_scored`: `100`.
+- `num_records`: `100`.
 
-Submission 2 is the parent because it is the promoted stable baseline.
-Submission 3 has a marginally higher public score, but its mixed span signal was not promoted.
+## Validated conclusion
+
+Conservative exact-offset symptom coverage from explicit chief-complaint and current-symptom structures materially improves the text and assertion components while all drug, laboratory, and candidate output remains fixed.
+The result is reproducible, interpretable, and plausibly private-test generalizable.
 
 ## Prediction summary
 
@@ -45,28 +55,8 @@ Submission 3 has a marginally higher public score, but its mixed span signal was
 
 The diff report is `outputs/submissions/02_add_labs_to_06_add_symptoms.diff.json`.
 The build report is `outputs/submissions/06_add_symptoms.report.json`.
-Neither JSON report is an upload artifact.
-The rebuild and audit ZIP files are verification artifacts and must not be uploaded.
 
-## Verification evidence
+## Next milestone
 
-Every entity passed the strict type-dependent serializer and exact raw-offset validator.
-Every drug candidate occurs in the pinned RxNorm archive.
-The final ZIP contains exactly `output/1.json` through `output/100.json`.
-Three independent builds produced the same artifact SHA-256.
-The corpus precision audit inspected every generated symptom and removed general event, procedure, follow-up, device, metadata, and normal-state false-positive patterns through tested structural rules.
-
-## Portal feedback to return
-
-After manual upload, return:
-
-- Portal submission identifier if shown.
-- Submission timestamp.
-- Final score.
-- WER.
-- `J_assertion`.
-- `J_candidates`.
-- `num_scored`.
-- `num_records`.
-
-The result will be recorded as `local-s006` if the portal identifier is not shown.
+Do not spend the next guaranteed slot on another minor symptom, span, or candidate-cardinality ablation.
+Build diagnosis extraction with pinned ICD linking on top of Submission 6, validate it offline, and submit the integrated improvement when it is ready.
