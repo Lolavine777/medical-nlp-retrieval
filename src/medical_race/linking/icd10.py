@@ -59,8 +59,11 @@ def normalize_icd_text(text: str) -> str:
 
 
 def build_term_index(terms: tuple[ICD10Term, ...]) -> dict[str, ICD10Term]:
+    leaf_codes = {term.code for term in terms if term.is_leaf}
     grouped = defaultdict(list)
     for term in terms:
+        if term.code not in leaf_codes:
+            continue
         normalized = normalize_icd_text(term.name)
         if normalized:
             grouped[normalized].append(term)
