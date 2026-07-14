@@ -57,6 +57,10 @@ def build_submission(
     }
 
 
+def _console_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True)
+
+
 def _commit() -> str:
     return subprocess.check_output(
         ["git", "rev-parse", "HEAD"], text=True, encoding="utf-8"
@@ -83,7 +87,7 @@ def main() -> None:
     with report_path.open("x", encoding="utf-8") as output:
         json.dump(report, output, ensure_ascii=False, indent=2, sort_keys=True)
         output.write("\n")
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+    print(_console_json(report))
 
 
 if __name__ == "__main__":

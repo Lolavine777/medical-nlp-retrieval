@@ -5,7 +5,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from tools.build_submission import build_submission
+from tools.build_submission import _console_json, build_submission
 
 
 RAW = "Thuốc trước khi nhập viện\n- aspirin\n"
@@ -49,12 +49,8 @@ class SubmissionBuilderTest(unittest.TestCase):
             )
             first = root / "first.zip"
             second = root / "second.zip"
-            report = build_submission(
-                input_zip, rxnorm_zip, config, first, expected_md5
-            )
-            second_report = build_submission(
-                input_zip, rxnorm_zip, config, second, expected_md5
-            )
+            report = build_submission(input_zip, rxnorm_zip, config, first, expected_md5)
+            second_report = build_submission(input_zip, rxnorm_zip, config, second, expected_md5)
             self.assertEqual(first.read_bytes(), second.read_bytes())
             self.assertEqual(report["output_sha256"], second_report["output_sha256"])
             self.assertEqual(report["entity_count"], 100)
@@ -66,6 +62,11 @@ class SubmissionBuilderTest(unittest.TestCase):
             self.assertEqual(len(report["input_sha256"]), 64)
             self.assertEqual(len(report["ontology_sha256"]), 64)
             self.assertEqual(len(report["config_sha256"]), 64)
+
+    def test_console_json_survives_windows_legacy_encoding(self):
+        value = {"type": "TRIỆU_CHỨNG"}
+        encoded = _console_json(value).encode("cp1252")
+        self.assertEqual(json.loads(encoded.decode("cp1252")), value)
 
 
 if __name__ == "__main__":
