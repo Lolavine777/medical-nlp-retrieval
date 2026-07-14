@@ -9,6 +9,17 @@
       "compliant": true,
       "unused_checkpoints_included": false,
       "evidence": "Rule-only baseline; no model checkpoints are active."
+    },
+    {
+      "id": "qwen_grounded_proposals",
+      "status": "experimental",
+      "active_model_ids": [
+        "qwen3_4b_instruct_2507"
+      ],
+      "combined_parameters": 4000000000,
+      "compliant": true,
+      "unused_checkpoints_included": false,
+      "evidence": "One pinned Qwen checkpoint proposes mentions; deterministic code grounds, links, and validates every accepted entity."
     }
   ]
 }

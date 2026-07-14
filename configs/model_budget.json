@@ -1,6 +1,15 @@
 {
   "limit_parameters": 9000000000,
   "confirmed_by": "organizer clarification supplied 2026-07-11",
-  "models": [],
-  "total_unique_parameters": 0
+  "models": [
+    {
+      "id": "qwen3_4b_instruct_2507",
+      "source": "Qwen/Qwen3-4B-Instruct-2507",
+      "revision": "1b4199c4f36b0cef378bfb12390c18780c18af4c",
+      "parameters": 4000000000,
+      "license": "Apache-2.0",
+      "purpose": "Clinical mention proposals before deterministic grounding"
+    }
+  ],
+  "total_unique_parameters": 4000000000
 }
