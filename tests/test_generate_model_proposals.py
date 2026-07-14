@@ -14,6 +14,7 @@ from medical_race.model_proposals import (
 from tools.generate_model_proposals import (
     generate_document,
     generate_proposal_directory,
+    select_document_shard,
 )
 
 
@@ -185,6 +186,24 @@ class ResumableGenerationTests(unittest.TestCase):
             self.assertGreater(len(calls), first_calls)
             self.assertFalse(list(root.rglob("*.tmp")))
             read_proposal_directory(root, documents)
+
+
+class DocumentShardTests(unittest.TestCase):
+    def test_selects_disjoint_exhaustive_numeric_document_shards(self):
+        documents = {f"input/{index}.txt": str(index) for index in range(1, 6)}
+
+        first = select_document_shard(documents, 0, 2)
+        second = select_document_shard(documents, 1, 2)
+
+        self.assertEqual(list(first), ["input/1.txt", "input/3.txt", "input/5.txt"])
+        self.assertEqual(list(second), ["input/2.txt", "input/4.txt"])
+        self.assertEqual(set(first) | set(second), set(documents))
+        self.assertFalse(set(first) & set(second))
+
+        with self.assertRaisesRegex(ValueError, "shard index"):
+            select_document_shard(documents, 2, 2)
+        with self.assertRaisesRegex(ValueError, "shard count"):
+            select_document_shard(documents, 0, 0)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,25 @@ from medical_race.model_proposals import (
 from tools.audit_sources import read_zip_documents, validate_document_names
 
 
+def select_document_shard(
+    documents: Mapping[str, str],
+    shard_index: int,
+    shard_count: int,
+) -> dict[str, str]:
+    if shard_count < 1:
+        raise ValueError("shard count must be positive")
+    if shard_index < 0 or shard_index >= shard_count:
+        raise ValueError("shard index must be between zero and shard count minus one")
+    try:
+        return {
+            name: raw_text
+            for name, raw_text in documents.items()
+            if (int(Path(name).stem) - 1) % shard_count == shard_index
+        }
+    except ValueError as error:
+        raise ValueError("document names must have numeric stems") from error
+
+
 def generate_document(
     raw_text: str,
     generate: Callable[[str], str],
@@ -192,11 +211,14 @@ def main() -> None:
     )
     parser.add_argument("--model-path", type=Path)
     parser.add_argument("--max-chars", type=int, default=6000)
+    parser.add_argument("--shard-index", type=int, default=0)
+    parser.add_argument("--shard-count", type=int, default=1)
     args = parser.parse_args()
 
     print(json.dumps(_manifest(), sort_keys=True))
     documents = read_zip_documents(args.input)
     validate_document_names(list(documents))
+    documents = select_document_shard(documents, args.shard_index, args.shard_count)
     generate_proposal_directory(
         documents,
         args.output,
