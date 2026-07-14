@@ -3,6 +3,11 @@
 This repository is an evidence-first, offline clinical NLP pipeline for the Viettel AI Race 2026 medical task.
 The current milestone audits the official artifacts, fixes annotation invariants, and defines the end-to-end rule baseline before model training.
 
+## New here?
+
+Start with [Team Onboarding](docs/TEAM_ONBOARDING.md).
+It maps the system, current state, safe task boundaries, and the exact verification command.
+
 ## Canonical artifacts
 
 - `input.zip` is the single canonical raw input artifact and must remain at the repository root.
