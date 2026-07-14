@@ -25,6 +25,9 @@ def build_submission(
     rxnorm_zip = Path(rxnorm_zip)
     config_path = Path(config_path)
     destination = Path(destination)
+    input_sha256 = sha256(input_zip)
+    ontology_sha256 = sha256(rxnorm_zip)
+    config_sha256 = sha256(config_path)
     documents = read_zip_documents(input_zip)
     validate_document_names(list(documents))
     terms = read_rxnorm_archive(rxnorm_zip, expected_md5)
@@ -40,9 +43,9 @@ def build_submission(
     linked_drugs = entity_counts["THUỐC"]
     return {
         "commit": _commit(),
-        "input_sha256": sha256(input_zip),
-        "ontology_sha256": sha256(rxnorm_zip),
-        "config_sha256": sha256(config_path),
+        "input_sha256": input_sha256,
+        "ontology_sha256": ontology_sha256,
+        "config_sha256": config_sha256,
         "output_sha256": package["sha256"],
         "entry_count": package["entry_count"],
         "entity_count": package["entity_count"],

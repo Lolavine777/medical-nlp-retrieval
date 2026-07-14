@@ -4,7 +4,9 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
+import tools.build_submission as build_module
 from tools.build_submission import _console_json, build_submission
 
 
@@ -49,7 +51,24 @@ class SubmissionBuilderTest(unittest.TestCase):
             )
             first = root / "first.zip"
             second = root / "second.zip"
-            report = build_submission(input_zip, rxnorm_zip, config, first, expected_md5)
+            state = {"ontology_loaded": False}
+            original_read = build_module.read_rxnorm_archive
+            original_sha256 = build_module.sha256
+
+            def tracked_read(*args):
+                state["ontology_loaded"] = True
+                return original_read(*args)
+
+            def low_memory_sha256(path):
+                if state["ontology_loaded"]:
+                    raise MemoryError("hashing after ontology load exceeds memory budget")
+                return original_sha256(path)
+
+            with (
+                patch.object(build_module, "read_rxnorm_archive", side_effect=tracked_read),
+                patch.object(build_module, "sha256", side_effect=low_memory_sha256),
+            ):
+                report = build_submission(input_zip, rxnorm_zip, config, first, expected_md5)
             second_report = build_submission(input_zip, rxnorm_zip, config, second, expected_md5)
             self.assertEqual(first.read_bytes(), second.read_bytes())
             self.assertEqual(report["output_sha256"], second_report["output_sha256"])
