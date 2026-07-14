@@ -7,6 +7,7 @@ from medical_race.sections import Section, parse_sections
 
 
 TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
+RESISTANCE_SUPPLEMENT = re.compile(r"U8[2-5](?:\.|$)")
 DIAGNOSIS_SUBHEADINGS = (
     "các phát hiện chẩn đoán khác",
     "các kết quả chẩn đoán khác",
@@ -76,12 +77,17 @@ def _patterns(term_index: dict[str, ICD10Term]):
     output = defaultdict(list)
     for normalized, term in term_index.items():
         pattern = tuple(normalized.split())
-        if len(pattern) < 2:
+        if len(pattern) < 2 or not _is_diagnosis_code(term.code):
             continue
         output[pattern[0]].append((pattern, term))
     for values in output.values():
         values.sort(key=lambda value: (-len(value[0]), value[1].code))
     return output
+
+
+def _is_diagnosis_code(code: str) -> bool:
+    normalized = code.upper()
+    return not normalized.startswith("R") and RESISTANCE_SUPPLEMENT.match(normalized) is None
 
 
 def _context_ranges(raw_text: str):
