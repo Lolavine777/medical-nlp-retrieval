@@ -1,6 +1,10 @@
+import hashlib
 import json
+import re
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from medical_race.assertions import classify_assertions
 from medical_race.extraction import Span
@@ -284,3 +288,136 @@ def _build_entity(
 
 def _overlaps(left_start: int, left_end: int, right_start: int, right_end: int) -> bool:
     return left_start < right_end and right_start < left_end
+
+
+MANIFEST_FIELDS = frozenset(
+    {
+        "format_version",
+        "model_id",
+        "model_revision",
+        "model_parameters",
+        "prompt_version",
+        "prompt_sha256",
+        "generation",
+    }
+)
+DOCUMENT_FIELDS = frozenset(
+    {"name", "raw_sha256", "chunk_count", "parse_error_count", "proposals"}
+)
+GENERATION_CONFIG = {"do_sample": False, "max_new_tokens": 2048}
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+def prompt_sha256() -> str:
+    return hashlib.sha256(PROMPT_HEADER.encode("utf-8")).hexdigest()
+
+
+def read_proposal_manifest(root: Path) -> dict[str, object]:
+    manifest = _read_json_object(Path(root) / "manifest.json", "manifest")
+    if set(manifest) != MANIFEST_FIELDS:
+        raise ValueError("invalid proposal manifest fields")
+    if (
+        type(manifest["format_version"]) is not int
+        or manifest["format_version"] != 1
+    ):
+        raise ValueError("unsupported proposal format version")
+    if manifest["model_id"] != MODEL_ID:
+        raise ValueError("unexpected model ID")
+    if manifest["model_revision"] != MODEL_REVISION:
+        raise ValueError("unexpected model revision")
+    if (
+        type(manifest["model_parameters"]) is not int
+        or manifest["model_parameters"] != MODEL_PARAMETERS
+    ):
+        raise ValueError("unexpected model parameter count")
+    if (
+        type(manifest["prompt_version"]) is not int
+        or manifest["prompt_version"] != PROMPT_VERSION
+    ):
+        raise ValueError("unexpected prompt version")
+    prompt_hash = manifest["prompt_sha256"]
+    if (
+        not isinstance(prompt_hash, str)
+        or SHA256_PATTERN.fullmatch(prompt_hash) is None
+        or prompt_hash != prompt_sha256()
+    ):
+        raise ValueError("unexpected prompt SHA-256")
+    generation = manifest["generation"]
+    if (
+        not isinstance(generation, dict)
+        or set(generation) != set(GENERATION_CONFIG)
+        or generation["do_sample"] is not False
+        or type(generation["max_new_tokens"]) is not int
+        or generation["max_new_tokens"] != GENERATION_CONFIG["max_new_tokens"]
+    ):
+        raise ValueError("unexpected generation configuration")
+    return manifest
+
+
+def read_proposal_directory(
+    root: Path,
+    documents: Mapping[str, str],
+) -> dict[str, tuple[ModelProposal, ...]]:
+    root = Path(root)
+    read_proposal_manifest(root)
+    document_root = root / "documents"
+    expected_files = {f"{Path(name).stem}.json" for name in documents}
+    actual_files = (
+        {path.name for path in document_root.glob("*.json")}
+        if document_root.is_dir()
+        else set()
+    )
+    if actual_files != expected_files:
+        raise ValueError("proposal document files do not match expected documents")
+
+    output = {}
+    for name, raw_text in documents.items():
+        if not isinstance(name, str) or not isinstance(raw_text, str):
+            raise ValueError("documents must map names to raw text")
+        record = _read_json_object(
+            document_root / f"{Path(name).stem}.json",
+            f"proposal document {name}",
+        )
+        if set(record) != DOCUMENT_FIELDS:
+            raise ValueError(f"invalid proposal document fields: {name}")
+        if record["name"] != name:
+            raise ValueError(f"proposal document name mismatch: {name}")
+        expected_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+        if record["raw_sha256"] != expected_hash:
+            raise ValueError(f"input SHA-256 mismatch: {name}")
+        chunk_count = record["chunk_count"]
+        parse_error_count = record["parse_error_count"]
+        if type(chunk_count) is not int or chunk_count < 0:
+            raise ValueError(f"invalid chunk count: {name}")
+        if (
+            type(parse_error_count) is not int
+            or parse_error_count < 0
+            or parse_error_count > chunk_count
+        ):
+            raise ValueError(f"invalid parse error count: {name}")
+        try:
+            serialized = json.dumps(record["proposals"], ensure_ascii=False)
+            proposals = parse_model_response(serialized)
+            ground_proposals(raw_text, proposals)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"invalid proposals: {name}") from error
+        ordered = tuple(
+            sorted(
+                proposals,
+                key=lambda value: (value.line_index, value.text, value.entity_type),
+            )
+        )
+        if proposals != ordered:
+            raise ValueError(f"proposals are not in deterministic order: {name}")
+        output[name] = proposals
+    return output
+
+
+def _read_json_object(path: Path, label: str) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"invalid {label}") from error
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
