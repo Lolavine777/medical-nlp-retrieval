@@ -283,6 +283,7 @@ def _valid_model_structure(value: GroundedProposal) -> bool:
             and folded not in CURRENT_HEADINGS
             and not folded.startswith("các triệu chứng")
             and not folded.startswith(REJECT_PREFIXES)
+            and re.search(r"(?i)\b(?:vào ngày|vào|từ|đến|là)\s*$", text) is None
             and LEADING_CUE.match(text) is None
             and NORMAL_STATE.search(text) is None
         )
@@ -291,7 +292,7 @@ def _valid_model_structure(value: GroundedProposal) -> bool:
             words <= 5
             and len(text) <= 40
             and ":" not in text
-            and (NUMERIC.search(text) is not None or QUALITATIVE.search(text) is not None)
+            and (NUMERIC.fullmatch(text) is not None or QUALITATIVE.fullmatch(text) is not None)
         )
     if value.entity_type == "TÊN_XÉT_NGHIỆM":
         return words <= 6 and len(text) <= 40 and ":" not in text

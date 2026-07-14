@@ -24,6 +24,7 @@ class ModelPrecisionTests(unittest.TestCase):
             "Các triệu chứng hiện tại triệu chứng\n"
             "Phủ nhận khó thở\n"
             "Bệnh nhân tỉnh, tiếp xúc được\n"
+            "sốt lần cuối là vào ngày\n"
             "mệt mỏi\n"
         )
         proposals = (
@@ -39,7 +40,8 @@ class ModelPrecisionTests(unittest.TestCase):
                 "Bệnh nhân tỉnh, tiếp xúc được",
                 "TRIỆU_CHỨNG",
             ),
-            ModelProposal(5, "mệt mỏi", "TRIỆU_CHỨNG"),
+            ModelProposal(5, "sốt lần cuối là vào ngày", "TRIỆU_CHỨNG"),
+            ModelProposal(6, "mệt mỏi", "TRIỆU_CHỨNG"),
         )
         report = Counter()
 
@@ -52,7 +54,7 @@ class ModelPrecisionTests(unittest.TestCase):
         )
 
         self.assertEqual([entity["text"] for entity in entities], ["mệt mỏi"])
-        self.assertEqual(report["invalid_structure"], 4)
+        self.assertEqual(report["invalid_structure"], 5)
 
     def test_rejects_broad_labs_and_treatment_context(self):
         raw = (
@@ -62,6 +64,7 @@ class ModelPrecisionTests(unittest.TestCase):
             "troponin là 0.03\n"
             "- phosphate là 5.6\n"
             "được cho vancomycin 1 gram\n"
+            "0.03\n"
         )
         proposals = (
             ModelProposal(
@@ -73,6 +76,7 @@ class ModelPrecisionTests(unittest.TestCase):
             ModelProposal(3, "troponin là 0.03", "KẾT_QUẢ_XÉT_NGHIỆM"),
             ModelProposal(4, "- phosphate là 5.6", "KẾT_QUẢ_XÉT_NGHIỆM"),
             ModelProposal(5, "được cho vancomycin 1 gram", "THUỐC"),
+            ModelProposal(6, "0.03", "KẾT_QUẢ_XÉT_NGHIỆM"),
         )
         report = Counter()
 
@@ -86,9 +90,9 @@ class ModelPrecisionTests(unittest.TestCase):
 
         self.assertEqual(
             [(entity["text"], entity["type"]) for entity in entities],
-            [("troponin là 0.03", "KẾT_QUẢ_XÉT_NGHIỆM")],
+            [("0.03", "KẾT_QUẢ_XÉT_NGHIỆM")],
         )
-        self.assertEqual(report["invalid_structure"], 4)
+        self.assertEqual(report["invalid_structure"], 5)
 
 
 if __name__ == "__main__":
