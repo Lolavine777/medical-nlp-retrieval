@@ -1,5 +1,6 @@
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,11 +12,16 @@ from medical_race.extraction.labs import extract_labs
 from medical_race.extraction.symptoms import extract_symptoms
 from medical_race.linking.icd10 import ICD10Term
 from medical_race.linking.rxnorm import RxNormTerm, link_drug
+from medical_race.model_proposals import ModelProposal, accept_model_proposals
 from medical_race.output import validate_entities
 
 
 REQUIRED_CONFIG_FIELDS = {"include_labs", "span_policy", "concept_level", "candidate_output"}
-OPTIONAL_CONFIG_FIELDS = {"include_symptoms", "include_diagnoses"}
+OPTIONAL_CONFIG_FIELDS = {
+    "include_symptoms",
+    "include_diagnoses",
+    "include_model_proposals",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +32,7 @@ class SubmissionConfig:
     candidate_output: str
     include_symptoms: bool = False
     include_diagnoses: bool = False
+    include_model_proposals: bool = False
 
     def __post_init__(self):
         if type(self.include_labs) is not bool:
@@ -34,6 +41,8 @@ class SubmissionConfig:
             raise ValueError("include_symptoms must be boolean")
         if type(self.include_diagnoses) is not bool:
             raise ValueError("include_diagnoses must be boolean")
+        if type(self.include_model_proposals) is not bool:
+            raise ValueError("include_model_proposals must be boolean")
         if self.span_policy not in {"regimen", "core"}:
             raise ValueError(f"unknown span policy: {self.span_policy!r}")
         if self.concept_level not in {"all_retrievable", "ingredient"}:
@@ -55,6 +64,7 @@ def load_submission_config(path: Path) -> SubmissionConfig:
         )
     values.setdefault("include_symptoms", False)
     values.setdefault("include_diagnoses", False)
+    values.setdefault("include_model_proposals", False)
     return SubmissionConfig(**values)
 
 
@@ -63,6 +73,8 @@ def predict_document(
     terms: tuple[RxNormTerm, ...],
     config: SubmissionConfig,
     icd_index: dict[str, ICD10Term] | None = None,
+    model_proposals: tuple[ModelProposal, ...] = (),
+    model_report: Counter | None = None,
 ) -> list[dict[str, object]]:
     if config.include_diagnoses and icd_index is None:
         raise ValueError("verified ICD-10 term index is required when diagnoses are enabled")
@@ -126,6 +138,19 @@ def predict_document(
                     "position": [span.start, span.end],
                 }
             )
+    if config.include_model_proposals:
+        result = accept_model_proposals(
+            raw_text,
+            model_proposals,
+            entities,
+            terms,
+            icd_index or {},
+            config.concept_level,
+            config.candidate_output,
+        )
+        entities.extend(result.entities)
+        if model_report is not None:
+            model_report.update(result.rejected)
     entities.sort(key=lambda entity: (entity["position"][0], entity["position"][1], entity["type"]))
     validate_entities(raw_text, entities)
     return entities

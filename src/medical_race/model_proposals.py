@@ -1,8 +1,12 @@
 import json
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 
+from medical_race.assertions import classify_assertions
 from medical_race.extraction import Span
 from medical_race.line_roles import parse_line_roles
+from medical_race.linking.icd10 import ICD10Term, is_diagnosis_code, link_diagnosis
+from medical_race.linking.rxnorm import RxNormTerm, link_drug
 
 
 ALLOWED_TYPES = frozenset(
@@ -14,6 +18,21 @@ ALLOWED_TYPES = frozenset(
         "THUỐC",
     }
 )
+TYPE_SECTIONS = {
+    "TRIỆU_CHỨNG": {
+        "unsectioned",
+        "current_illness",
+        "symptoms",
+        "admission_reason",
+        "course",
+        "exam",
+        "assessment",
+    },
+    "TÊN_XÉT_NGHIỆM": {"laboratory", "assessment"},
+    "KẾT_QUẢ_XÉT_NGHIỆM": {"laboratory", "assessment"},
+    "CHẨN_ĐOÁN": {"past_history", "diagnosis", "imaging", "assessment"},
+    "THUỐC": {"medications", "course", "assessment"},
+}
 MODEL_ID = "Qwen/Qwen3-4B-Instruct-2507"
 MODEL_REVISION = "1b4199c4f36b0cef378bfb12390c18780c18af4c"
 MODEL_PARAMETERS = 4_000_000_000
@@ -47,6 +66,12 @@ class GroundedProposal:
     entity_type: str
     section: str
     role: str
+
+
+@dataclass(frozen=True, slots=True)
+class ModelMergeResult:
+    entities: tuple[dict[str, object], ...]
+    rejected: dict[str, int]
 
 
 def parse_model_response(value: str) -> tuple[ModelProposal, ...]:
@@ -158,3 +183,104 @@ def ground_proposals(
             ),
         )
     )
+
+
+def accept_model_proposals(
+    raw_text: str,
+    proposals: tuple[ModelProposal, ...],
+    stable_entities: list[dict[str, object]],
+    terms: tuple[RxNormTerm, ...],
+    icd_index: dict[str, ICD10Term],
+    concept_level: str,
+    candidate_output: str,
+) -> ModelMergeResult:
+    rejected = Counter()
+    grounded = []
+    for proposal in proposals:
+        try:
+            grounded.extend(ground_proposals(raw_text, (proposal,)))
+        except ValueError:
+            rejected["not_grounded"] += 1
+
+    stable_spans = [tuple(entity["position"]) for entity in stable_entities]
+    filtered = {}
+    for value in grounded:
+        if value.role in {"header", "blank"} or value.section not in TYPE_SECTIONS[value.entity_type]:
+            rejected["invalid_section"] += 1
+            continue
+        if any(_overlaps(value.span.start, value.span.end, start, end) for start, end in stable_spans):
+            rejected["stable_overlap"] += 1
+            continue
+        filtered[(value.span.start, value.span.end, value.entity_type)] = value
+
+    by_span = defaultdict(list)
+    for value in filtered.values():
+        by_span[(value.span.start, value.span.end)].append(value)
+    unambiguous = []
+    for values in by_span.values():
+        if len({value.entity_type for value in values}) > 1:
+            rejected["ambiguous_type"] += len(values)
+        else:
+            unambiguous.extend(values)
+
+    selected = []
+    for value in sorted(
+        unambiguous,
+        key=lambda item: (-(item.span.end - item.span.start), item.span.start, item.entity_type),
+    ):
+        if any(_overlaps(value.span.start, value.span.end, other.span.start, other.span.end) for other in selected):
+            rejected["model_overlap"] += 1
+            continue
+        selected.append(value)
+
+    entities = []
+    for value in sorted(selected, key=lambda item: (item.span.start, item.span.end, item.entity_type)):
+        entity = _build_entity(
+            raw_text,
+            value,
+            terms,
+            icd_index,
+            concept_level,
+            candidate_output,
+        )
+        if entity is None:
+            rejected["unlinked_candidate"] += 1
+            continue
+        entities.append(entity)
+        rejected["accepted"] += 1
+    return ModelMergeResult(tuple(entities), dict(sorted(rejected.items())))
+
+
+def _build_entity(
+    raw_text: str,
+    value: GroundedProposal,
+    terms: tuple[RxNormTerm, ...],
+    icd_index: dict[str, ICD10Term],
+    concept_level: str,
+    candidate_output: str,
+) -> dict[str, object] | None:
+    span = value.span
+    entity = {
+        "text": span.text,
+        "type": value.entity_type,
+        "position": [span.start, span.end],
+    }
+    if value.entity_type == "CHẨN_ĐOÁN":
+        link = link_diagnosis(span.text, icd_index)
+        if link is None or not is_diagnosis_code(link.code):
+            return None
+        entity["candidates"] = [link.code]
+        entity["assertions"] = list(classify_assertions(raw_text, span).labels())
+    elif value.entity_type == "THUỐC":
+        link = link_drug(span.text, terms, concept_level, candidate_output)
+        if link is None:
+            return None
+        entity["candidates"] = list(link.candidates)
+        entity["assertions"] = list(classify_assertions(raw_text, span).labels())
+    elif value.entity_type == "TRIỆU_CHỨNG":
+        entity["assertions"] = list(classify_assertions(raw_text, span).labels())
+    return entity
+
+
+def _overlaps(left_start: int, left_end: int, right_start: int, right_end: int) -> bool:
+    return left_start < right_end and right_start < left_end

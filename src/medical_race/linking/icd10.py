@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
+RESISTANCE_SUPPLEMENT = re.compile(r"U8[2-5](?:\.|$)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +81,11 @@ def build_term_index(terms: tuple[ICD10Term, ...]) -> dict[str, ICD10Term]:
 
 def link_diagnosis(text: str, index: dict[str, ICD10Term]) -> ICD10Term | None:
     return index.get(normalize_icd_text(text))
+
+
+def is_diagnosis_code(code: str) -> bool:
+    normalized = code.upper()
+    return not normalized.startswith("R") and RESISTANCE_SUPPLEMENT.match(normalized) is None
 
 
 def _parse_term(value: object) -> ICD10Term:

@@ -1,10 +1,15 @@
 import unittest
 
 from medical_race.extraction.diagnoses import extract_diagnoses
-from medical_race.linking.icd10 import ICD10Term, build_term_index
+from medical_race.linking.icd10 import ICD10Term, build_term_index, is_diagnosis_code
 
 
 class DiagnosisCodePolicyTests(unittest.TestCase):
+    def test_shared_code_policy(self):
+        self.assertFalse(is_diagnosis_code("R06.0"))
+        self.assertFalse(is_diagnosis_code("U83.0"))
+        self.assertTrue(is_diagnosis_code("J18.9"))
+
     def test_rejects_symptom_chapter_and_resistance_supplement_codes(self):
         raw = "Tiền sử bệnh\nKhó thở\nKháng vancomycin\nViêm phổi\n"
         index = build_term_index(
