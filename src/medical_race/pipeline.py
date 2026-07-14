@@ -7,11 +7,13 @@ from medical_race.assertions import classify_assertions
 from medical_race.extraction import Span
 from medical_race.extraction.drugs import extract_drugs
 from medical_race.extraction.labs import extract_labs
+from medical_race.extraction.symptoms import extract_symptoms
 from medical_race.linking.rxnorm import RxNormTerm, link_drug
 from medical_race.output import validate_entities
 
 
-CONFIG_FIELDS = {"include_labs", "span_policy", "concept_level", "candidate_output"}
+REQUIRED_CONFIG_FIELDS = {"include_labs", "span_policy", "concept_level", "candidate_output"}
+OPTIONAL_CONFIG_FIELDS = {"include_symptoms"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,10 +22,13 @@ class SubmissionConfig:
     span_policy: str
     concept_level: str
     candidate_output: str
+    include_symptoms: bool = False
 
     def __post_init__(self):
         if type(self.include_labs) is not bool:
             raise ValueError("include_labs must be boolean")
+        if type(self.include_symptoms) is not bool:
+            raise ValueError("include_symptoms must be boolean")
         if self.span_policy not in {"regimen", "core"}:
             raise ValueError(f"unknown span policy: {self.span_policy!r}")
         if self.concept_level not in {"all_retrievable", "ingredient"}:
@@ -34,8 +39,16 @@ class SubmissionConfig:
 
 def load_submission_config(path: Path) -> SubmissionConfig:
     values = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(values, dict) or set(values) != CONFIG_FIELDS:
-        raise ValueError(f"config fields must be exactly {sorted(CONFIG_FIELDS)}")
+    if not isinstance(values, dict):
+        raise ValueError("config must be an object")
+    fields = set(values)
+    allowed = REQUIRED_CONFIG_FIELDS | OPTIONAL_CONFIG_FIELDS
+    if not REQUIRED_CONFIG_FIELDS <= fields or fields - allowed:
+        raise ValueError(
+            f"config fields must contain {sorted(REQUIRED_CONFIG_FIELDS)} "
+            f"and only use {sorted(allowed)}"
+        )
+    values.setdefault("include_symptoms", False)
     return SubmissionConfig(**values)
 
 
@@ -81,6 +94,16 @@ def predict_document(
                         "position": [result.value.start, result.value.end],
                     },
                 )
+            )
+    if config.include_symptoms:
+        for span in extract_symptoms(raw_text):
+            entities.append(
+                {
+                    "text": span.text,
+                    "type": "TRIỆU_CHỨNG",
+                    "assertions": list(classify_assertions(raw_text, span).labels()),
+                    "position": [span.start, span.end],
+                }
             )
     entities.sort(key=lambda entity: (entity["position"][0], entity["position"][1], entity["type"]))
     validate_entities(raw_text, entities)

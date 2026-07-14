@@ -1,0 +1,7 @@
+{
+  "include_labs": true,
+  "span_policy": "regimen",
+  "concept_level": "all_retrievable",
+  "candidate_output": "top1",
+  "include_symptoms": true
+}

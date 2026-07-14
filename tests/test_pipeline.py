@@ -99,6 +99,46 @@ class PipelineTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "fields"):
                 load_submission_config(path)
 
+    def test_symptom_toggle_adds_only_valid_symptom_entities(self):
+        raw = "Lý do nhập viện: đau ngực\nCác triệu chứng hiện tại\n- Không chóng mặt"
+        without = predict_document(raw, TERMS, config())
+        enabled = predict_document(raw, TERMS, config(include_symptoms=True))
+        self.assertEqual([e for e in enabled if e["type"] != "TRIỆU_CHỨNG"], without)
+        self.assertEqual(
+            [e for e in enabled if e["type"] == "TRIỆU_CHỨNG"],
+            [
+                {
+                    "text": "đau ngực",
+                    "type": "TRIỆU_CHỨNG",
+                    "assertions": [],
+                    "position": [raw.index("đau ngực"), raw.index("đau ngực") + len("đau ngực")],
+                },
+                {
+                    "text": "chóng mặt",
+                    "type": "TRIỆU_CHỨNG",
+                    "assertions": ["isNegated"],
+                    "position": [raw.index("chóng mặt"), raw.index("chóng mặt") + len("chóng mặt")],
+                },
+            ],
+        )
+        validate_entities(raw, enabled)
+
+    def test_legacy_config_defaults_symptoms_off_and_rejects_bad_optional_field(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            values = {
+                "include_labs": True,
+                "span_policy": "regimen",
+                "concept_level": "all_retrievable",
+                "candidate_output": "top1",
+            }
+            path.write_text(json.dumps(values), encoding="utf-8")
+            self.assertFalse(load_submission_config(path).include_symptoms)
+            values["include_symptoms"] = "yes"
+            path.write_text(json.dumps(values), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "include_symptoms"):
+                load_submission_config(path)
+
 
 if __name__ == "__main__":
     unittest.main()
