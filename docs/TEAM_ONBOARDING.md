@@ -1,7 +1,8 @@
 # Team Onboarding
 
 This repository is an offline clinical NLP system for the Viettel AI Race 2026 task.
-The immediate goal is to improve the stable Submission 8 pipeline and evaluate the Submission 9 Qwen proposal run when its archive returns.
+The current stable evidence is Submission 8 and corrected Submission 9 at score `16.13250`.
+When the organizer confirms the update is live, start with the [post-update bring-up checklist](post_update_bringup_checklist.md).
 
 ## Start here
 
@@ -29,7 +30,7 @@ $env:PYTHONIOENCODING = "utf-8"
 ```
 
 The full suite is the first required check before and after a change.
-The current baseline has 139 passing tests.
+The current baseline is verified by the full suite command above; the exact count is intentionally not hard-coded in onboarding.
 
 ## System map
 
@@ -49,8 +50,9 @@ The current baseline has 139 passing tests.
 
 Submission 8 is the stable baseline at score `16.13250`.
 Its components were WER `84.6803`, assertion Jaccard `16.933`, and candidate Jaccard `16.1416`.
-Submission 9 is an overnight Qwen proposal-generation run and is not yet a leaderboard artifact.
-Do not modify the Submission 8 configuration while the Submission 9 archive is being generated.
+Corrected Submission 9 is a valid final archive and reproduced Submission 8 at score `16.13250`.
+Submission 9 was a packaging and reproducibility control, not a leaderboard improvement.
+Do not start post-update work until the user explicitly confirms that the organizer update is live.
 
 The main strategic gap is recall and candidate linking, not packaging.
 Small rule tweaks are lower priority than interpretable coverage or linking improvements.
