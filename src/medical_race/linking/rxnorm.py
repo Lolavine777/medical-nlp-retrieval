@@ -53,9 +53,23 @@ def link_drug(
         raise ValueError(f"unknown concept level: {concept_level!r}")
     if candidate_output not in {"top1", "top2"}:
         raise ValueError(f"unknown candidate output: {candidate_output!r}")
+    ranked = rank_drug_candidates(text, terms, concept_level)
+    if not ranked:
+        return None
+    limit = 1 if candidate_output == "top1" else 2
+    return LinkResult(tuple(term.rxcui for term in ranked[:limit]), ranked[0].text)
+
+
+def rank_drug_candidates(
+    text: str,
+    terms: tuple[RxNormTerm, ...],
+    concept_level: str = "all_retrievable",
+) -> tuple[RxNormTerm, ...]:
+    if concept_level not in {"all_retrievable", "ingredient"}:
+        raise ValueError(f"unknown concept level: {concept_level!r}")
     normalized_text = _normalize(text)
     if not normalized_text:
-        return None
+        return ()
     by_text, by_first_token = _term_index(terms)
     words = normalized_text.split()
     matching_texts = {
@@ -100,10 +114,11 @@ def link_drug(
         if term.rxcui not in seen:
             ranked.append(term)
             seen.add(term.rxcui)
-    if not ranked:
-        return None
-    limit = 1 if candidate_output == "top1" else 2
-    return LinkResult(tuple(term.rxcui for term in ranked[:limit]), ranked[0].text)
+    return tuple(ranked)
+
+
+def normalize_rxnorm_text(text: str) -> str:
+    return _normalize(text)
 
 
 @lru_cache(maxsize=None)

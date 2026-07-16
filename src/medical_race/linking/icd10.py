@@ -79,6 +79,19 @@ def build_term_index(terms: tuple[ICD10Term, ...]) -> dict[str, ICD10Term]:
     return index
 
 
+def exact_icd_candidates(
+    text: str,
+    terms: tuple[ICD10Term, ...],
+) -> tuple[ICD10Term, ...]:
+    normalized = normalize_icd_text(text)
+    by_code = {
+        term.code: term
+        for term in terms
+        if term.is_leaf and normalize_icd_text(term.name) == normalized
+    }
+    return tuple(by_code[code] for code in sorted(by_code))
+
+
 def link_diagnosis(text: str, index: dict[str, ICD10Term]) -> ICD10Term | None:
     return index.get(normalize_icd_text(text))
 
