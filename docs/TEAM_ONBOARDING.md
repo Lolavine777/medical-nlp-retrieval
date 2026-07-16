@@ -4,6 +4,9 @@ This repository is an offline clinical NLP system for the Viettel AI Race 2026 t
 The current stable evidence is Submission 8 and corrected Submission 9 at score `16.13250`.
 When the organizer confirms the update is live, start with the [post-update bring-up checklist](post_update_bringup_checklist.md).
 
+The active three-person assignments, file boundaries, and Git workflow are in [Team Workstreams, 16 July 2026](TEAM_WORKSTREAMS_2026-07-16.md).
+Read that page before choosing a task from the general list below.
+
 ## Start here
 
 Read these files in order:

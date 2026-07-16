@@ -87,7 +87,7 @@ The first deliverables are to publish the current verified baseline, create the 
 The current verified `master` must be pushed before either teammate creates a branch.
 Every task branch starts from that exact remote baseline and remains short-lived.
 
-Recommended branch prefixes are `team-a/`, `team-b/`, and `codex/`.
+Recommended branch prefixes are `team-a/`, `team-b/`, and `lead/`.
 Each branch should contain one testable hypothesis rather than an entire workstream backlog.
 
 Every pull request must report:
