@@ -188,6 +188,84 @@ class ProposalDirectoryTests(unittest.TestCase):
 
 
 class ResumableGenerationTests(unittest.TestCase):
+    def test_writes_failed_raw_response_only_to_diagnostics(self):
+        documents = {"input/1.txt": RAW}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            summary = generate_proposal_directory(
+                documents,
+                root / "proposals",
+                lambda prompt: "```json\n[]\n```",
+                prompt_version=2,
+                diagnostics_output=root / "diagnostics",
+            )
+
+            record = json.loads(
+                (root / "proposals" / "documents" / "1.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            diagnostic = json.loads(
+                (root / "diagnostics" / "1.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(record["proposals"], [])
+            self.assertEqual(record["parse_error_count"], 1)
+            self.assertEqual(
+                set(diagnostic),
+                {"name", "prompt_version", "failures"},
+            )
+            self.assertEqual(
+                diagnostic["failures"][0],
+                {
+                    "document": "input/1.txt",
+                    "chunk_index": 0,
+                    "prompt_version": 2,
+                    "category": "parse",
+                    "raw_response": "```json\n[]\n```",
+                },
+            )
+            self.assertEqual(summary["parse_errors"], 1)
+            self.assertEqual(summary["type_counts"], {})
+
+    def test_records_grounding_failures_and_regenerates_missing_diagnostics(self):
+        documents = {"input/1.txt": RAW}
+        calls = []
+
+        def generate(prompt):
+            calls.append(prompt)
+            return '[{"line_index":99,"text":"missing","type":"TRIỆU_CHỨNG"}]'
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proposal_root = root / "proposals"
+            diagnostics_root = root / "diagnostics"
+            generate_proposal_directory(
+                documents,
+                proposal_root,
+                generate,
+                prompt_version=2,
+                diagnostics_output=diagnostics_root,
+            )
+            diagnostic_path = diagnostics_root / "1.json"
+            diagnostic = json.loads(diagnostic_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                diagnostic["failures"][0]["category"],
+                "grounding",
+            )
+            first_calls = len(calls)
+            diagnostic_path.unlink()
+
+            generate_proposal_directory(
+                documents,
+                proposal_root,
+                generate,
+                prompt_version=2,
+                diagnostics_output=diagnostics_root,
+            )
+
+            self.assertGreater(len(calls), first_calls)
+            self.assertTrue(diagnostic_path.is_file())
+
     def test_skips_valid_files_and_regenerates_invalid_partial_files(self):
         calls = []
 
