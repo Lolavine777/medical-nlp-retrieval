@@ -3,9 +3,12 @@ import unittest
 from medical_race.model_proposals import (
     GroundedProposal,
     ModelProposal,
+    PROMPT_ALLOWED_TYPES,
+    PROMPT_HEADERS,
     ground_proposals,
     parse_model_response,
     prompt_chunks,
+    prompt_sha256,
 )
 
 
@@ -36,6 +39,26 @@ class ModelResponseTest(unittest.TestCase):
 
 
 class PromptChunkTest(unittest.TestCase):
+    def test_prompt_profiles_preserve_v1_and_target_v2(self):
+        self.assertEqual(set(PROMPT_HEADERS), {1, 2})
+        self.assertNotEqual(prompt_sha256(1), prompt_sha256(2))
+        self.assertEqual(
+            PROMPT_ALLOWED_TYPES[2],
+            frozenset(
+                {
+                    "TRIỆU_CHỨNG",
+                    "TÊN_XÉT_NGHIỆM",
+                    "KẾT_QUẢ_XÉT_NGHIỆM",
+                }
+            ),
+        )
+        prompt = prompt_chunks(
+            "Triệu chứng hiện tại\nHo\n",
+            prompt_version=2,
+        )[0].prompt
+        self.assertNotIn("CHẨN_ĐOÁN", prompt)
+        self.assertNotIn("THUỐC", prompt)
+
     def test_chunks_nonblank_lines_once_with_global_indices(self):
         raw = "Chẩn đoán\nViêm phổi\n\nTriệu chứng hiện tại\nHo\n"
 

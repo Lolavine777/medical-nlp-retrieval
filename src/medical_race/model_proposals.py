@@ -47,8 +47,11 @@ TYPE_SECTIONS = {
 MODEL_ID = "Qwen/Qwen3-4B-Instruct-2507"
 MODEL_REVISION = "1b4199c4f36b0cef378bfb12390c18780c18af4c"
 MODEL_PARAMETERS = 4_000_000_000
-PROMPT_VERSION = 1
-PROMPT_HEADER = """Extract clinical mentions from the supplied raw lines.
+PROMPT_VERSION = 2
+TARGETED_TYPES = frozenset(
+    {"TRIỆU_CHỨNG", "TÊN_XÉT_NGHIỆM", "KẾT_QUẢ_XÉT_NGHIỆM"}
+)
+PROMPT_V1_HEADER = """Extract clinical mentions from the supplied raw lines.
 Return only a JSON array.
 Each object must contain exactly line_index, text, and type.
 Copy text verbatim from one supplied line.
@@ -56,6 +59,24 @@ Use only these types: CHẨN_ĐOÁN, KẾT_QUẢ_XÉT_NGHIỆM, THUỐC, TRIỆU
 Include every genuine mention occurrence and no headings or metadata.
 Lines are formatted as line_index, section, role, and raw text separated by tabs.
 """
+PROMPT_V2_HEADER = """Extract atomic symptom and laboratory mentions from the supplied raw lines.
+Return only one strict JSON array with no Markdown or explanation.
+Each object must contain exactly line_index, text, and type.
+Copy text verbatim from one supplied line.
+Use only these types: KẾT_QUẢ_XÉT_NGHIỆM, TRIỆU_CHỨNG, TÊN_XÉT_NGHIỆM.
+Never return a heading, metadata, procedure, date, standalone unit, treatment action, normal-state description, whole bullet, or whole sentence.
+For laboratory content, return the test name and its numeric or qualitative result as separate objects.
+For symptom content, exclude bullets and assertion cues from the copied symptom text.
+Example input:
+10\tlaboratory\tlab\tNatri: 138 mmol/L; CRP âm tính
+11\tsymptoms\tbullet\t- Không khó nuốt nhưng đau vai khi vận động
+Example output:
+[{"line_index":10,"text":"Natri","type":"TÊN_XÉT_NGHIỆM"},{"line_index":10,"text":"138 mmol/L","type":"KẾT_QUẢ_XÉT_NGHIỆM"},{"line_index":10,"text":"CRP","type":"TÊN_XÉT_NGHIỆM"},{"line_index":10,"text":"âm tính","type":"KẾT_QUẢ_XÉT_NGHIỆM"},{"line_index":11,"text":"khó nuốt","type":"TRIỆU_CHỨNG"},{"line_index":11,"text":"đau vai khi vận động","type":"TRIỆU_CHỨNG"}]
+Lines are formatted as line_index, section, role, and raw text separated by tabs.
+"""
+PROMPT_HEADERS = {1: PROMPT_V1_HEADER, 2: PROMPT_V2_HEADER}
+PROMPT_ALLOWED_TYPES = {1: ALLOWED_TYPES, 2: TARGETED_TYPES}
+PROMPT_HEADER = PROMPT_HEADERS[PROMPT_VERSION]
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +106,10 @@ class ModelMergeResult:
     rejected: dict[str, int]
 
 
-def parse_model_response(value: str) -> tuple[ModelProposal, ...]:
+def parse_model_response(
+    value: str,
+    allowed_types: frozenset[str] = ALLOWED_TYPES,
+) -> tuple[ModelProposal, ...]:
     if not isinstance(value, str):
         raise ValueError("model response must be a string")
     try:
@@ -106,17 +130,23 @@ def parse_model_response(value: str) -> tuple[ModelProposal, ...]:
             raise ValueError(f"proposal {index} line_index must be a nonnegative integer")
         if not isinstance(text, str) or not text:
             raise ValueError(f"proposal {index} text must be a non-empty string")
-        if not isinstance(entity_type, str) or entity_type not in ALLOWED_TYPES:
+        if not isinstance(entity_type, str) or entity_type not in allowed_types:
             raise ValueError(f"proposal {index} has unknown type: {entity_type!r}")
         proposals.append(ModelProposal(line_index, text, entity_type))
     return tuple(proposals)
 
 
-def prompt_chunks(raw_text: str, max_chars: int = 6000) -> tuple[PromptChunk, ...]:
+def prompt_chunks(
+    raw_text: str,
+    max_chars: int = 6000,
+    prompt_version: int = PROMPT_VERSION,
+) -> tuple[PromptChunk, ...]:
     if not isinstance(raw_text, str):
         raise TypeError("raw_text must be a string")
     if type(max_chars) is not int or max_chars <= 0:
         raise ValueError("max_chars must be a positive integer")
+    if type(prompt_version) is not int or prompt_version not in PROMPT_HEADERS:
+        raise ValueError("unsupported prompt version")
 
     lines = parse_line_roles(raw_text)
     groups: list[list[tuple[int, object]]] = []
@@ -138,7 +168,7 @@ def prompt_chunks(raw_text: str, max_chars: int = 6000) -> tuple[PromptChunk, ..
     return tuple(
         PromptChunk(
             tuple(index for index, _ in group),
-            PROMPT_HEADER
+            PROMPT_HEADERS[prompt_version]
             + "\n"
             + "\n".join(
                 f"{index}\t{line.section}\t{line.role}\t{line.text}"
@@ -359,8 +389,10 @@ GENERATION_CONFIG = {"do_sample": False, "max_new_tokens": 2048}
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
-def prompt_sha256() -> str:
-    return hashlib.sha256(PROMPT_HEADER.encode("utf-8")).hexdigest()
+def prompt_sha256(prompt_version: int = PROMPT_VERSION) -> str:
+    if type(prompt_version) is not int or prompt_version not in PROMPT_HEADERS:
+        raise ValueError("unsupported prompt version")
+    return hashlib.sha256(PROMPT_HEADERS[prompt_version].encode("utf-8")).hexdigest()
 
 
 def read_proposal_manifest(root: Path) -> dict[str, object]:
@@ -381,16 +413,14 @@ def read_proposal_manifest(root: Path) -> dict[str, object]:
         or manifest["model_parameters"] != MODEL_PARAMETERS
     ):
         raise ValueError("unexpected model parameter count")
-    if (
-        type(manifest["prompt_version"]) is not int
-        or manifest["prompt_version"] != PROMPT_VERSION
-    ):
+    prompt_version = manifest["prompt_version"]
+    if type(prompt_version) is not int or prompt_version not in PROMPT_HEADERS:
         raise ValueError("unexpected prompt version")
     prompt_hash = manifest["prompt_sha256"]
     if (
         not isinstance(prompt_hash, str)
         or SHA256_PATTERN.fullmatch(prompt_hash) is None
-        or prompt_hash != prompt_sha256()
+        or prompt_hash != prompt_sha256(prompt_version)
     ):
         raise ValueError("unexpected prompt SHA-256")
     generation = manifest["generation"]
@@ -410,7 +440,8 @@ def read_proposal_directory(
     documents: Mapping[str, str],
 ) -> dict[str, tuple[ModelProposal, ...]]:
     root = Path(root)
-    read_proposal_manifest(root)
+    manifest = read_proposal_manifest(root)
+    allowed_types = PROMPT_ALLOWED_TYPES[manifest["prompt_version"]]
     document_root = root / "documents"
     expected_files = {f"{Path(name).stem}.json" for name in documents}
     actual_files = (
@@ -448,7 +479,7 @@ def read_proposal_directory(
             raise ValueError(f"invalid parse error count: {name}")
         try:
             serialized = json.dumps(record["proposals"], ensure_ascii=False)
-            proposals = parse_model_response(serialized)
+            proposals = parse_model_response(serialized, allowed_types)
             ground_proposals(raw_text, proposals)
         except (TypeError, ValueError) as error:
             raise ValueError(f"invalid proposals: {name}") from error

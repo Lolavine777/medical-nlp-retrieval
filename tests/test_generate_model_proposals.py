@@ -8,7 +8,7 @@ from medical_race.model_proposals import (
     MODEL_ID,
     MODEL_PARAMETERS,
     MODEL_REVISION,
-    PROMPT_HEADER,
+    PROMPT_HEADERS,
     read_proposal_directory,
 )
 from tools.generate_model_proposals import (
@@ -21,14 +21,16 @@ from tools.generate_model_proposals import (
 RAW = "Triệu chứng hiện tại\n- đau ngực\nChẩn đoán\nViêm phổi\n"
 
 
-def manifest():
+def manifest(prompt_version: int = 1):
     return {
         "format_version": 1,
         "model_id": MODEL_ID,
         "model_revision": MODEL_REVISION,
         "model_parameters": MODEL_PARAMETERS,
-        "prompt_version": 1,
-        "prompt_sha256": hashlib.sha256(PROMPT_HEADER.encode("utf-8")).hexdigest(),
+        "prompt_version": prompt_version,
+        "prompt_sha256": hashlib.sha256(
+            PROMPT_HEADERS[prompt_version].encode("utf-8")
+        ).hexdigest(),
         "generation": {"do_sample": False, "max_new_tokens": 2048},
     }
 
@@ -158,6 +160,30 @@ class ProposalDirectoryTests(unittest.TestCase):
 
             write_json(root / "documents" / "2.json", {})
             with self.assertRaisesRegex(ValueError, "document files"):
+                read_proposal_directory(root, {"input/1.txt": RAW})
+
+    def test_version_two_manifest_rejects_non_targeted_type(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_json(root / "manifest.json", manifest(prompt_version=2))
+            write_json(
+                root / "documents" / "1.json",
+                {
+                    "name": "input/1.txt",
+                    "raw_sha256": hashlib.sha256(RAW.encode("utf-8")).hexdigest(),
+                    "chunk_count": 1,
+                    "parse_error_count": 0,
+                    "proposals": [
+                        {
+                            "line_index": 3,
+                            "text": "Viêm phổi",
+                            "type": "CHẨN_ĐOÁN",
+                        }
+                    ],
+                },
+            )
+
+            with self.assertRaisesRegex(ValueError, "invalid proposals"):
                 read_proposal_directory(root, {"input/1.txt": RAW})
 
 
