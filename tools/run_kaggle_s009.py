@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -16,10 +17,21 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from medical_race.model_proposals import (  # noqa: E402
     MODEL_ID,
     MODEL_REVISION,
+    PROMPT_HEADERS,
     prompt_chunks,
     read_proposal_directory,
     read_proposal_manifest,
 )
+
+RUN_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def validate_run_name(value: str) -> str:
+    if not isinstance(value, str) or RUN_NAME.fullmatch(value) is None:
+        raise ValueError(
+            "run name must contain only letters, numbers, dot, underscore, and hyphen"
+        )
+    return value
 from tools.audit_sources import (  # noqa: E402
     read_zip_documents,
     validate_document_names,
@@ -115,11 +127,19 @@ def merge_shards(
             shutil.copy2(source, document_root / source.name)
     if len({json.dumps(manifest, sort_keys=True) for manifest in manifests}) != 1:
         raise ValueError("shard manifests differ")
+    manifest = manifests[0]
     shutil.copy2(Path(shards[0]) / "manifest.json", final / "manifest.json")
     proposals = read_proposal_directory(final, documents)
     records = [json.loads(path.read_text(encoding="utf-8")) for path in document_root.glob("*.json")]
     if any(
-        record["chunk_count"] != len(prompt_chunks(documents[record["name"]], max_chars))
+        record["chunk_count"]
+        != len(
+            prompt_chunks(
+                documents[record["name"]],
+                max_chars,
+                manifest["prompt_version"],
+            )
+        )
         for record in records
     ):
         raise ValueError("shard record uses the wrong chunk size")
@@ -140,6 +160,9 @@ def _sha256(path: Path) -> str:
 
 
 def run(args: argparse.Namespace) -> dict[str, object]:
+    run_name = validate_run_name(args.run_name)
+    if type(args.prompt_version) is not int or args.prompt_version not in PROMPT_HEADERS:
+        raise ValueError("unsupported prompt version")
     work_root = Path(args.work_root)
     input_zip = prepare_input_zip(Path(args.input_root), work_root / "input.zip")
     os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
@@ -162,18 +185,28 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "--input", str(input_zip),
         "--model-path", str(model_path),
         "--max-chars", str(args.max_chars),
+        "--prompt-version", str(args.prompt_version),
         "--shard-count", "2",
     ]
     processes = []
     logs = []
     for index in range(2):
-        shard = work_root / f"qwen3-4b-s009-shard-{index}"
-        log_path = work_root / f"qwen-s009-shard-{index}.log"
+        shard = work_root / f"{run_name}-shard-{index}"
+        diagnostics = work_root / f"{run_name}-diagnostics-shard-{index}"
+        log_path = work_root / f"{run_name}-shard-{index}.log"
         log = log_path.open("w", encoding="utf-8", buffering=1)
         environment = _worker_environment(index)
         processes.append(
             subprocess.Popen(
-                base + ["--shard-index", str(index), "--output", str(shard)],
+                base
+                + [
+                    "--shard-index",
+                    str(index),
+                    "--output",
+                    str(shard),
+                    "--diagnostics-output",
+                    str(diagnostics),
+                ],
                 cwd=PROJECT_ROOT,
                 env=environment,
                 stdout=log,
@@ -184,7 +217,13 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         logs.append((log, log_path))
     while any(process.poll() is None for process in processes):
         counts = [
-            len(list((work_root / f"qwen3-4b-s009-shard-{index}" / "documents").glob("*.json")))
+            len(
+                list(
+                    (
+                        work_root / f"{run_name}-shard-{index}" / "documents"
+                    ).glob("*.json")
+                )
+            )
             for index in range(2)
         ]
         print(f"Completed documents: {counts[0]}/50, {counts[1]}/50", flush=True)
@@ -200,20 +239,47 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         raise RuntimeError(f"Qwen workers failed:\n{details}")
 
     summary = merge_shards(
-        [work_root / f"qwen3-4b-s009-shard-{index}" for index in range(2)],
-        work_root / "qwen3-4b-s009",
+        [work_root / f"{run_name}-shard-{index}" for index in range(2)],
+        work_root / run_name,
         documents,
         args.max_chars,
     )
+    diagnostics_root = work_root / f"{run_name}-diagnostics"
+    if diagnostics_root.exists():
+        shutil.rmtree(diagnostics_root)
+    diagnostics_root.mkdir(parents=True)
+    copied_diagnostics = set()
+    for index in range(2):
+        source_root = work_root / f"{run_name}-diagnostics-shard-{index}"
+        for source in source_root.glob("*.json"):
+            if source.name in copied_diagnostics:
+                raise ValueError(f"duplicate diagnostic document: {source.name}")
+            copied_diagnostics.add(source.name)
+            shutil.copy2(source, diagnostics_root / source.name)
     archive = Path(
         shutil.make_archive(
-            str(work_root / "qwen3-4b-s009"),
+            str(work_root / run_name),
             "zip",
             root_dir=work_root,
-            base_dir="qwen3-4b-s009",
+            base_dir=run_name,
         )
     )
-    result = {**summary, "archive": str(archive), "sha256": _sha256(archive)}
+    diagnostics_archive = Path(
+        shutil.make_archive(
+            str(work_root / f"{run_name}-diagnostics"),
+            "zip",
+            root_dir=work_root,
+            base_dir=f"{run_name}-diagnostics",
+        )
+    )
+    result = {
+        **summary,
+        "prompt_version": args.prompt_version,
+        "archive": str(archive),
+        "sha256": _sha256(archive),
+        "diagnostics_archive": str(diagnostics_archive),
+        "diagnostics_sha256": _sha256(diagnostics_archive),
+    }
     print(json.dumps(result, indent=2), flush=True)
     return result
 
@@ -225,6 +291,13 @@ def main() -> None:
     parser.add_argument("--model-path", type=Path)
     parser.add_argument("--max-chars", type=int, default=2500)
     parser.add_argument("--poll-seconds", type=int, default=15)
+    parser.add_argument("--run-name", default="qwen3-4b-s009")
+    parser.add_argument(
+        "--prompt-version",
+        type=int,
+        choices=sorted(PROMPT_HEADERS),
+        default=1,
+    )
     run(parser.parse_args())
 
 

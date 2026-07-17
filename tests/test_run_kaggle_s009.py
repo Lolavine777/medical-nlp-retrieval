@@ -1,13 +1,16 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools.run_kaggle_s009 import (
     _worker_environment,
     merge_shards,
     prepare_input_zip,
+    validate_run_name,
     wait_for_workers,
 )
+from medical_race.model_proposals import prompt_chunks
 from tools.audit_sources import read_zip_documents
 from tools.generate_model_proposals import generate_proposal_directory, select_document_shard
 
@@ -100,16 +103,42 @@ class ValidMergeTests(unittest.TestCase):
                     shard,
                     lambda prompt: "[]",
                     2500,
+                    prompt_version=1,
                 )
                 shards.append(shard)
 
-            summary = merge_shards(shards, root / "final", documents, 2500)
+            with patch(
+                "tools.run_kaggle_s009.prompt_chunks",
+                wraps=prompt_chunks,
+            ) as chunks:
+                summary = merge_shards(
+                    shards,
+                    root / "final",
+                    documents,
+                    2500,
+                )
 
             self.assertEqual(summary["documents"], 100)
             self.assertEqual(summary["proposals"], 0)
+            self.assertTrue(chunks.call_args_list)
+            self.assertTrue(
+                all(call.args[2] == 1 for call in chunks.call_args_list)
+            )
 
 
 class WorkerTests(unittest.TestCase):
+    def test_accepts_safe_run_name_and_rejects_paths(self):
+        self.assertEqual(
+            validate_run_name("qwen3-4b-s010"),
+            "qwen3-4b-s010",
+        )
+        for value in ("../escape", "nested/name", "", "."):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                ValueError,
+                "run name",
+            ):
+                validate_run_name(value)
+
     def test_builds_linux_pythonpath_for_kaggle_worker(self):
         environment = _worker_environment(1)
 
