@@ -1,5 +1,6 @@
 import hashlib
 import json
+import runpy
 import sys
 import tempfile
 import unittest
@@ -29,10 +30,23 @@ def rrf_row():
 
 
 class AugmentSubmissionTest(unittest.TestCase):
-    def prepare(self, root):
+    def prepare(self, root, raw1=RAW_WITH_PROPOSALS, response_items=None):
+        if response_items is None:
+            response_items = [
+                {
+                    "line_index": 1,
+                    "text": "đau cũ",
+                    "type": "TRIỆU_CHỨNG",
+                },
+                {
+                    "line_index": 2,
+                    "text": "đau mới",
+                    "type": "TRIỆU_CHỨNG",
+                },
+            ]
         documents = {
             f"input/{number}.txt": (
-                RAW_WITH_PROPOSALS if number == 1 else "Ghi chú\n"
+                raw1 if number == 1 else "Ghi chú\n"
             )
             for number in range(1, 101)
         }
@@ -42,7 +56,7 @@ class AugmentSubmissionTest(unittest.TestCase):
                 archive.writestr(name, raw_text)
 
         parent_predictions = {name: [] for name in documents}
-        start = RAW_WITH_PROPOSALS.index("đau cũ")
+        start = raw1.index("đau cũ")
         parent_predictions["input/1.txt"] = [
             {
                 "text": "đau cũ",
@@ -60,18 +74,7 @@ class AugmentSubmissionTest(unittest.TestCase):
             if "đau mới" not in prompt:
                 return "[]"
             return json.dumps(
-                [
-                    {
-                        "line_index": 1,
-                        "text": "đau cũ",
-                        "type": "TRIỆU_CHỨNG",
-                    },
-                    {
-                        "line_index": 2,
-                        "text": "đau mới",
-                        "type": "TRIỆU_CHỨNG",
-                    },
-                ],
+                response_items,
                 ensure_ascii=False,
             )
 
@@ -179,7 +182,7 @@ class AugmentSubmissionTest(unittest.TestCase):
             ]
 
             with patch.object(sys, "argv", argv):
-                augment_module.main()
+                runpy.run_path(augment_module.__file__, run_name="__main__")
 
             report = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(report["diff"]["added_entities"], 1)
@@ -235,6 +238,51 @@ class AugmentSubmissionTest(unittest.TestCase):
                     expected_md5=rxnorm_md5,
                 )
             self.assertFalse(destination.exists())
+
+    def test_filters_treatment_action_but_keeps_atomic_symptom(self):
+        raw = "Triệu chứng hiện tại\n- đau cũ\n- đau mới\n- điều trị chống đông\n"
+        items = [
+            {
+                "line_index": 2,
+                "text": "đau mới",
+                "type": "TRIỆU_CHỨNG",
+            },
+            {
+                "line_index": 3,
+                "text": "điều trị chống đông",
+                "type": "TRIỆU_CHỨNG",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                _,
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                rxnorm_md5,
+                config,
+            ) = self.prepare(root, raw1=raw, response_items=items)
+            child_zip = root / "child.zip"
+
+            report = augment_submission(
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                config,
+                child_zip,
+                expected_md5=rxnorm_md5,
+            )
+
+            with zipfile.ZipFile(child_zip) as child:
+                entities = json.loads(child.read("output/1.json"))
+            self.assertEqual(
+                [entity["text"] for entity in entities],
+                ["đau cũ", "đau mới"],
+            )
+            self.assertEqual(report["model_rejections"]["precision_filter"], 1)
 
     def test_rejects_proposal_hash_mismatch_before_creating_destination(self):
         with tempfile.TemporaryDirectory() as directory:

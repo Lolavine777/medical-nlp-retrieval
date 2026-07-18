@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -25,7 +26,41 @@ from tools.audit_sources import read_zip_documents, sha256, validate_document_na
 from tools.build_submission import (
     DEFAULT_ICD10_PATH,
     PINNED_ICD10_SHA256,
-    PUBLISHED_RXNORM_MD5,
+PUBLISHED_RXNORM_MD5,
+)
+
+
+MODEL_ACTION_CUES = (
+    "điều trị",
+    "tự điều trị",
+    "can thiệp",
+    "gọi cho",
+    "bác sĩ",
+    "bệnh nhân được",
+    "khuyên dùng",
+    "xuất viện",
+)
+MODEL_PROCEDURE_CUES = (
+    "chọc dò",
+    "thủ thuật",
+    "lấy mẫu",
+    "chụp ",
+    "siêu âm ",
+    "tạo ảnh",
+    "stent ",
+)
+MODEL_CONTEXT_FRAGMENTS = frozenset(
+    {
+        "bên trái",
+        "bên phải",
+        "liên tục",
+        "kém",
+        "khoảng vài năm",
+        "2 tháng trước",
+        "sự kiện trước khi nhập viện",
+        "đặc biệt là khi hít thở sâu",
+        "khi hít thở sâu",
+    }
 )
 
 
@@ -74,9 +109,13 @@ def augment_submission(
     predictions = {}
     for name, raw_text in documents.items():
         parent_entities = parent_predictions[name]
+        filtered_proposals, filtered_count = _filter_precision_proposals(
+            proposals[name]
+        )
+        model_report["precision_filter"] += filtered_count
         result = accept_model_proposals(
             raw_text,
-            proposals[name],
+            filtered_proposals,
             parent_entities,
             terms,
             icd_index,
@@ -151,12 +190,44 @@ def _proposal_parse_error_count(root, documents):
     )
 
 
+def _filter_precision_proposals(proposals):
+    selected = []
+    rejected = 0
+    for proposal in proposals:
+        folded = " ".join(proposal.text.casefold().split())
+        if proposal.entity_type == "TRIỆU_CHỨNG":
+            invalid = (
+                folded in MODEL_CONTEXT_FRAGMENTS
+                or folded.startswith(MODEL_ACTION_CUES)
+                or re.search(r"\b(?:trước|sau)\b$", folded) is not None
+            )
+        elif proposal.entity_type == "TÊN_XÉT_NGHIỆM":
+            invalid = any(cue in folded for cue in MODEL_PROCEDURE_CUES)
+        else:
+            invalid = False
+        if invalid:
+            rejected += 1
+        else:
+            selected.append(proposal)
+    return tuple(selected), rejected
+
+
 def _commit():
     return subprocess.check_output(
         ["git", "rev-parse", "HEAD"],
         text=True,
         encoding="utf-8",
     ).strip()
+
+
+def _read_parent_predictions(path, documents):
+    preflight = validate_output_zip(path, documents)
+    with zipfile.ZipFile(path) as archive:
+        predictions = {
+            input_name: json.loads(archive.read(output_name).decode("utf-8"))
+            for input_name, output_name in zip(INPUT_NAMES, OUTPUT_NAMES, strict=True)
+        }
+    return predictions, preflight
 
 
 def main():
@@ -193,11 +264,5 @@ def main():
     print(json.dumps(report, ensure_ascii=True, sort_keys=True))
 
 
-def _read_parent_predictions(path, documents):
-    preflight = validate_output_zip(path, documents)
-    with zipfile.ZipFile(path) as archive:
-        predictions = {
-            input_name: json.loads(archive.read(output_name).decode("utf-8"))
-            for input_name, output_name in zip(INPUT_NAMES, OUTPUT_NAMES, strict=True)
-        }
-    return predictions, preflight
+if __name__ == "__main__":
+    main()
