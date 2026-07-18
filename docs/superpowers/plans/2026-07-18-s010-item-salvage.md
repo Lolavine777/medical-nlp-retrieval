@@ -228,4 +228,3 @@ $env:PYTHONIOENCODING = "utf-8"
 
 Promote only if the archive validates, stable entities have zero removals or changes, candidate count remains 150, and every accepted addition is structurally reviewed.
 Otherwise retain the salvaged archive as a diagnostic artifact and do not submit it.
-
