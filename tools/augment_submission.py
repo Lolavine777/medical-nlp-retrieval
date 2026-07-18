@@ -11,6 +11,7 @@ from medical_race.linking.icd10 import build_term_index, read_icd10_snapshot
 from medical_race.linking.rxnorm import read_rxnorm_archive
 from medical_race.model_proposals import (
     accept_model_proposals,
+    ground_proposals,
     read_proposal_directory,
     read_proposal_manifest,
 )
@@ -62,6 +63,13 @@ MODEL_CONTEXT_FRAGMENTS = frozenset(
         "khi hít thở sâu",
     }
 )
+MODEL_CONTEXT_PREFIXES = (
+    "bệnh nhân ",
+    "chỉ số ",
+    "kém trong ",
+    "tăng dần ",
+    "xung quanh ",
+)
 
 
 def augment_submission(
@@ -110,7 +118,8 @@ def augment_submission(
     for name, raw_text in documents.items():
         parent_entities = parent_predictions[name]
         filtered_proposals, filtered_count = _filter_precision_proposals(
-            proposals[name]
+            raw_text,
+            proposals[name],
         )
         model_report["precision_filter"] += filtered_count
         result = accept_model_proposals(
@@ -190,7 +199,7 @@ def _proposal_parse_error_count(root, documents):
     )
 
 
-def _filter_precision_proposals(proposals):
+def _filter_precision_proposals(raw_text, proposals):
     selected = []
     rejected = 0
     for proposal in proposals:
@@ -199,10 +208,20 @@ def _filter_precision_proposals(proposals):
             invalid = (
                 folded in MODEL_CONTEXT_FRAGMENTS
                 or folded.startswith(MODEL_ACTION_CUES)
+                or folded.startswith(MODEL_CONTEXT_PREFIXES)
                 or re.search(r"\b(?:trước|sau)\b$", folded) is not None
+                or re.fullmatch(r"\d+\s*lần\s*/\s*\w+", folded) is not None
             )
         elif proposal.entity_type == "TÊN_XÉT_NGHIỆM":
-            invalid = any(cue in folded for cue in MODEL_PROCEDURE_CUES)
+            invalid = any(cue in folded for cue in MODEL_PROCEDURE_CUES) or any(
+                value.section != "laboratory"
+                for value in ground_proposals(raw_text, (proposal,))
+            )
+        elif proposal.entity_type == "KẾT_QUẢ_XÉT_NGHIỆM":
+            invalid = any(
+                value.section != "laboratory"
+                for value in ground_proposals(raw_text, (proposal,))
+            )
         else:
             invalid = False
         if invalid:

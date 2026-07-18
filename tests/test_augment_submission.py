@@ -284,6 +284,107 @@ class AugmentSubmissionTest(unittest.TestCase):
             )
             self.assertEqual(report["model_rejections"]["precision_filter"], 1)
 
+    def test_filters_temporal_context_fragment_but_keeps_atomic_symptom(self):
+        raw = (
+            "Triệu chứng hiện tại\n"
+            "- đau cũ\n"
+            "- đau mới\n"
+            "- tăng dần trong vài tuần qua\n"
+        )
+        items = [
+            {
+                "line_index": 2,
+                "text": "đau mới",
+                "type": "TRIỆU_CHỨNG",
+            },
+            {
+                "line_index": 3,
+                "text": "tăng dần trong vài tuần qua",
+                "type": "TRIỆU_CHỨNG",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                _,
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                rxnorm_md5,
+                config,
+            ) = self.prepare(root, raw1=raw, response_items=items)
+            child_zip = root / "child.zip"
+
+            report = augment_submission(
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                config,
+                child_zip,
+                expected_md5=rxnorm_md5,
+            )
+
+            with zipfile.ZipFile(child_zip) as child:
+                entities = json.loads(child.read("output/1.json"))
+            self.assertEqual(
+                [entity["text"] for entity in entities],
+                ["đau cũ", "đau mới"],
+            )
+            self.assertEqual(report["model_rejections"]["precision_filter"], 1)
+
+    def test_filters_lab_type_outside_laboratory_section(self):
+        raw = (
+            "Triệu chứng hiện tại\n"
+            "- đau cũ\n"
+            "- đau mới\n"
+            "Đánh giá tại bệnh viện\n"
+            "- mri\n"
+        )
+        items = [
+            {
+                "line_index": 2,
+                "text": "đau mới",
+                "type": "TRIỆU_CHỨNG",
+            },
+            {
+                "line_index": 4,
+                "text": "mri",
+                "type": "TÊN_XÉT_NGHIỆM",
+            },
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                _,
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                rxnorm_md5,
+                config,
+            ) = self.prepare(root, raw1=raw, response_items=items)
+            child_zip = root / "child.zip"
+
+            report = augment_submission(
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                config,
+                child_zip,
+                expected_md5=rxnorm_md5,
+            )
+
+            with zipfile.ZipFile(child_zip) as child:
+                entities = json.loads(child.read("output/1.json"))
+            self.assertEqual(
+                [entity["text"] for entity in entities],
+                ["đau cũ", "đau mới"],
+            )
+            self.assertEqual(report["model_rejections"]["precision_filter"], 1)
+
     def test_rejects_proposal_hash_mismatch_before_creating_destination(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
