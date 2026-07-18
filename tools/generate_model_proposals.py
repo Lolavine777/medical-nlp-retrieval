@@ -20,6 +20,7 @@ from medical_race.model_proposals import (
     prompt_chunks,
     prompt_sha256,
     read_proposal_directory,
+    salvage_model_response,
 )
 from tools.audit_sources import read_zip_documents, validate_document_names
 
@@ -56,37 +57,22 @@ def generate_document(
     parse_error_count = 0
     for chunk_index, chunk in enumerate(chunks):
         response = generate(chunk.prompt)
-        try:
-            parsed = parse_model_response(
-                response,
-                PROMPT_ALLOWED_TYPES[prompt_version],
-            )
-        except (TypeError, ValueError):
+        parsed, failure_category = salvage_model_response(
+            raw_text,
+            response,
+            frozenset(chunk.line_indices),
+            PROMPT_ALLOWED_TYPES[prompt_version],
+        )
+        if failure_category is not None:
             parse_error_count += 1
             _record_failure(
                 failures,
                 document_name,
                 chunk_index,
                 prompt_version,
-                "parse",
+                failure_category,
                 response,
             )
-            continue
-        try:
-            if any(value.line_index not in chunk.line_indices for value in parsed):
-                raise ValueError("proposal refers outside its prompt chunk")
-            ground_proposals(raw_text, parsed)
-        except (TypeError, ValueError):
-            parse_error_count += 1
-            _record_failure(
-                failures,
-                document_name,
-                chunk_index,
-                prompt_version,
-                "grounding",
-                response,
-            )
-            continue
         proposals.extend(parsed)
     proposals.sort(key=lambda value: (value.line_index, value.text, value.entity_type))
     return {
