@@ -7,6 +7,7 @@ import zipfile
 from collections import Counter
 from pathlib import Path
 
+from medical_race.line_roles import parse_line_roles
 from medical_race.linking.icd10 import build_term_index, read_icd10_snapshot
 from medical_race.linking.rxnorm import read_rxnorm_archive
 from medical_race.model_proposals import (
@@ -69,6 +70,23 @@ MODEL_CONTEXT_PREFIXES = (
     "kém trong ",
     "tăng dần ",
     "xung quanh ",
+)
+MODEL_FAMILY_REPORTER = re.compile(
+    r"\b(?:gia đình|mẹ|bố|cha|vợ|chồng|anh|chị|em)\b.*"
+    r"\b(?:nhận thấy|cho biết|báo cáo)\b",
+    re.IGNORECASE,
+)
+MODEL_DIAGNOSIS_CONTEXT = re.compile(
+    r"\b(?:chẩn đoán|lo ngại về|nghi ngờ)\b",
+    re.IGNORECASE,
+)
+MODEL_IMAGING_CONTEXT = re.compile(
+    r"\b(?:chụp|ct|mri|x-quang|điện tâm đồ|ecg|siêu âm|tạo ảnh)\b",
+    re.IGNORECASE,
+)
+MODEL_VITAL_SIGN_CONTEXT = re.compile(
+    r"\b(?:nhịp tim|rung nhĩ|huyết áp|mạch|tần số thở)\b",
+    re.IGNORECASE,
 )
 
 
@@ -202,7 +220,9 @@ def _proposal_parse_error_count(root, documents):
 def _filter_precision_proposals(raw_text, proposals):
     selected = []
     rejected = 0
+    lines = parse_line_roles(raw_text)
     for proposal in proposals:
+        line = lines[proposal.line_index]
         folded = " ".join(proposal.text.casefold().split())
         if proposal.entity_type == "TRIỆU_CHỨNG":
             invalid = (
@@ -211,16 +231,34 @@ def _filter_precision_proposals(raw_text, proposals):
                 or folded.startswith(MODEL_CONTEXT_PREFIXES)
                 or re.search(r"\b(?:trước|sau)\b$", folded) is not None
                 or re.fullmatch(r"\d+\s*lần\s*/\s*\w+", folded) is not None
+                or MODEL_FAMILY_REPORTER.search(line.text) is not None
+                or (
+                    line.section == "assessment"
+                    and MODEL_DIAGNOSIS_CONTEXT.search(line.text) is not None
+                )
             )
         elif proposal.entity_type == "TÊN_XÉT_NGHIỆM":
-            invalid = any(cue in folded for cue in MODEL_PROCEDURE_CUES) or any(
-                value.section != "laboratory"
-                for value in ground_proposals(raw_text, (proposal,))
+            invalid = (
+                any(cue in folded for cue in MODEL_PROCEDURE_CUES)
+                or any(
+                    value.section != "laboratory"
+                    for value in ground_proposals(raw_text, (proposal,))
+                )
+                or MODEL_IMAGING_CONTEXT.search(line.text) is not None
             )
         elif proposal.entity_type == "KẾT_QUẢ_XÉT_NGHIỆM":
-            invalid = any(
-                value.section != "laboratory"
-                for value in ground_proposals(raw_text, (proposal,))
+            invalid = (
+                any(
+                    value.section != "laboratory"
+                    for value in ground_proposals(raw_text, (proposal,))
+                )
+                or any(
+                    pattern.search(line.text) is not None
+                    for pattern in (
+                        MODEL_IMAGING_CONTEXT,
+                        MODEL_VITAL_SIGN_CONTEXT,
+                    )
+                )
             )
         else:
             invalid = False

@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
+from medical_race.model_proposals import ModelProposal
 from medical_race.submission import build_output_zip, validate_output_zip
 import tools.augment_submission as augment_module
 from tools.augment_submission import augment_submission
@@ -30,6 +31,62 @@ def rrf_row():
 
 
 class AugmentSubmissionTest(unittest.TestCase):
+    def test_precision_filter_rejects_family_reporter_symptom(self):
+        raw = (
+            "Triệu chứng hiện tại\n"
+            "- Gia đình nhận thấy khó khăn khi cài cúc áo\n"
+        )
+        proposal = ModelProposal(1, "khó khăn khi cài cúc áo", "TRIỆU_CHỨNG")
+
+        selected, rejected = augment_module._filter_precision_proposals(
+            raw,
+            (proposal,),
+        )
+
+        self.assertEqual(selected, ())
+        self.assertEqual(rejected, 1)
+
+    def test_precision_filter_rejects_assessment_diagnosis_cue_only(self):
+        raw = (
+            "Đánh giá tại bệnh viện\n"
+            "Các phát hiện chẩn đoán khác: Lo ngại về Nhiễm virus Herpes simplex\n"
+            "- nhìn song thị\n"
+        )
+        diagnosis = ModelProposal(
+            1,
+            "Nhiễm virus Herpes simplex",
+            "TRIỆU_CHỨNG",
+        )
+        symptom = ModelProposal(2, "nhìn song thị", "TRIỆU_CHỨNG")
+
+        selected, rejected = augment_module._filter_precision_proposals(
+            raw,
+            (diagnosis, symptom),
+        )
+
+        self.assertEqual(selected, (symptom,))
+        self.assertEqual(rejected, 1)
+
+    def test_precision_filter_rejects_imaging_and_vital_sign_lab_values(self):
+        raw = (
+            "Kết quả xét nghiệm\n"
+            "- chụp CT sọ não: âm tính\n"
+            "- rung nhĩ ở mức 130-150, sau đó nhịp tim chậm\n"
+            "- troponin 0.10\n"
+        )
+        imaging = ModelProposal(1, "âm tính", "KẾT_QUẢ_XÉT_NGHIỆM")
+        vital_sign = ModelProposal(2, "130-150", "KẾT_QUẢ_XÉT_NGHIỆM")
+        test_name = ModelProposal(3, "troponin", "TÊN_XÉT_NGHIỆM")
+        test_value = ModelProposal(3, "0.10", "KẾT_QUẢ_XÉT_NGHIỆM")
+
+        selected, rejected = augment_module._filter_precision_proposals(
+            raw,
+            (imaging, vital_sign, test_name, test_value),
+        )
+
+        self.assertEqual(selected, (test_name, test_value))
+        self.assertEqual(rejected, 2)
+
     def prepare(self, root, raw1=RAW_WITH_PROPOSALS, response_items=None):
         if response_items is None:
             response_items = [
