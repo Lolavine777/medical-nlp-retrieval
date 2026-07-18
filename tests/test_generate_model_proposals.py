@@ -8,6 +8,7 @@ from medical_race.model_proposals import (
     MODEL_ID,
     MODEL_PARAMETERS,
     MODEL_REVISION,
+    PROMPT_ALLOWED_TYPES,
     PROMPT_HEADERS,
     read_proposal_directory,
 )
@@ -72,6 +73,48 @@ class GenerateDocumentTests(unittest.TestCase):
         )
 
         self.assertEqual(result["proposals"], [])
+        self.assertEqual(result["parse_error_count"], 1)
+
+    def test_keeps_valid_sibling_when_grounding_sibling_fails(self):
+        valid_type = sorted(PROMPT_ALLOWED_TYPES[2])[0]
+        response = (
+            '[{"line_index":1,"text":"cough","type":"'
+            + valid_type
+            + '"},{"line_index":1,"text":"fever","type":"'
+            + valid_type
+            + '"}]'
+        )
+
+        result = generate_document(
+            "symptoms\ncough\n",
+            lambda prompt: response,
+            prompt_version=2,
+        )
+
+        self.assertEqual(
+            result["proposals"],
+            [{"line_index":1,"text":"cough","type":valid_type}],
+        )
+        self.assertEqual(result["parse_error_count"], 1)
+
+    def test_keeps_valid_sibling_when_type_sibling_is_unknown(self):
+        valid_type = sorted(PROMPT_ALLOWED_TYPES[2])[0]
+        response = (
+            '[{"line_index":1,"text":"cough","type":"'
+            + valid_type
+            + '"},{"line_index":1,"text":"cough","type":"NOT_ALLOWED"}]'
+        )
+
+        result = generate_document(
+            "symptoms\ncough\n",
+            lambda prompt: response,
+            prompt_version=2,
+        )
+
+        self.assertEqual(
+            result["proposals"],
+            [{"line_index":1,"text":"cough","type":valid_type}],
+        )
         self.assertEqual(result["parse_error_count"], 1)
 
 

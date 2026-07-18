@@ -104,6 +104,25 @@ Return both archives and the final JSON to the team lead.
 Never upload either proposal archive to the competition portal.
 The portal accepts only the locally rebuilt and preflighted final output archive.
 
+## Offline replay of a completed run
+
+The raw Qwen proposal and diagnostics archives are evidence artifacts, not portal inputs.
+Replay them locally to retain valid siblings from imperfect chunks without another model run:
+
+```powershell
+$env:PYTHONPATH = "src;."
+$env:PYTHONIOENCODING = "utf-8"
+.\.venv\Scripts\python.exe tools\replay_model_diagnostics.py `
+  --input input.zip `
+  --proposals outputs\kaggle\qwen3-4b-s010.zip `
+  --diagnostics outputs\kaggle\qwen3-4b-s010-diagnostics.zip `
+  --output outputs\model_proposals\qwen3-4b-s010-salvaged
+```
+
+The replay command must validate 100 documents and report its recovered and rejected item counts.
+Use the replayed directory for the local build, diff, and submission preflight commands below.
+Never upload the raw Qwen archive or diagnostics archive.
+
 ## Local return path
 
 After the proposal archive is returned and extracted under `outputs/model_proposals/qwen3-4b-s010`, the team lead runs:

@@ -9,6 +9,7 @@ from medical_race.model_proposals import (
     parse_model_response,
     prompt_chunks,
     prompt_sha256,
+    salvage_model_response,
 )
 
 
@@ -36,6 +37,66 @@ class ModelResponseTest(unittest.TestCase):
         for value in invalid:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_model_response(value)
+
+    def test_salvage_keeps_valid_item_beside_invalid_grounding_item(self):
+        valid_type = sorted(PROMPT_ALLOWED_TYPES[2])[0]
+        response = (
+            '[{"line_index":1,"text":"cough","type":"'
+            + valid_type
+            + '"},{"line_index":1,"text":"fever","type":"'
+            + valid_type
+            + '"}]'
+        )
+
+        proposals, category = salvage_model_response(
+            "symptoms\ncough\n",
+            response,
+            frozenset({1}),
+            PROMPT_ALLOWED_TYPES[2],
+        )
+
+        self.assertEqual(proposals, (ModelProposal(1, "cough", valid_type),))
+        self.assertEqual(category, "grounding")
+
+    def test_salvage_keeps_valid_item_beside_unknown_type(self):
+        valid_type = sorted(PROMPT_ALLOWED_TYPES[2])[0]
+        response = (
+            '[{"line_index":1,"text":"cough","type":"'
+            + valid_type
+            + '"},{"line_index":1,"text":"cough","type":"NOT_ALLOWED"}]'
+        )
+
+        proposals, category = salvage_model_response(
+            "symptoms\ncough\n",
+            response,
+            frozenset({1}),
+            PROMPT_ALLOWED_TYPES[2],
+        )
+
+        self.assertEqual(proposals, (ModelProposal(1, "cough", valid_type),))
+        self.assertEqual(category, "parse")
+
+    def test_salvage_rejects_non_array_response(self):
+        proposals, category = salvage_model_response(
+            "symptoms\ncough\n",
+            "not json",
+            frozenset({1}),
+            PROMPT_ALLOWED_TYPES[2],
+        )
+
+        self.assertEqual(proposals, ())
+        self.assertEqual(category, "parse")
+
+    def test_salvage_accepts_empty_array_without_error(self):
+        proposals, category = salvage_model_response(
+            "symptoms\ncough\n",
+            "[]",
+            frozenset({1}),
+            PROMPT_ALLOWED_TYPES[2],
+        )
+
+        self.assertEqual(proposals, ())
+        self.assertIsNone(category)
 
 
 class PromptChunkTest(unittest.TestCase):

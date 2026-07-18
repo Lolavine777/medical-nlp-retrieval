@@ -136,6 +136,45 @@ def parse_model_response(
     return tuple(proposals)
 
 
+def salvage_model_response(
+    raw_text: str,
+    response: str,
+    line_indices: frozenset[int],
+    allowed_types: frozenset[str],
+) -> tuple[tuple[ModelProposal, ...], str | None]:
+    try:
+        payload = json.loads(response)
+    except (TypeError, json.JSONDecodeError):
+        return (), "parse"
+    if not isinstance(payload, list):
+        return (), "parse"
+
+    accepted = []
+    parse_failed = False
+    grounding_failed = False
+    for item in payload:
+        try:
+            proposal = parse_model_response(
+                json.dumps([item], ensure_ascii=False),
+                allowed_types,
+            )[0]
+        except (TypeError, ValueError):
+            parse_failed = True
+            continue
+        if proposal.line_index not in line_indices:
+            grounding_failed = True
+            continue
+        try:
+            ground_proposals(raw_text, (proposal,))
+        except (TypeError, ValueError):
+            grounding_failed = True
+            continue
+        accepted.append(proposal)
+
+    category = "parse" if parse_failed else "grounding" if grounding_failed else None
+    return tuple(accepted), category
+
+
 def prompt_chunks(
     raw_text: str,
     max_chars: int = 6000,
