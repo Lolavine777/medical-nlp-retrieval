@@ -1,4 +1,6 @@
+import argparse
 import json
+import subprocess
 import tempfile
 import zipfile
 from collections import Counter
@@ -9,6 +11,7 @@ from medical_race.linking.rxnorm import read_rxnorm_archive
 from medical_race.model_proposals import (
     accept_model_proposals,
     read_proposal_directory,
+    read_proposal_manifest,
 )
 from medical_race.pipeline import load_submission_config
 from medical_race.submission import (
@@ -18,7 +21,7 @@ from medical_race.submission import (
     validate_output_zip,
 )
 from medical_race.submission_diff import diff_submission_archives
-from tools.audit_sources import read_zip_documents, validate_document_names
+from tools.audit_sources import read_zip_documents, sha256, validate_document_names
 from tools.build_submission import (
     DEFAULT_ICD10_PATH,
     PINNED_ICD10_SHA256,
@@ -59,6 +62,7 @@ def augment_submission(
     if not config.include_model_proposals:
         raise ValueError("augmentation config must enable model proposals")
     proposals = read_proposal_directory(proposal_root, documents)
+    manifest = read_proposal_manifest(proposal_root)
     terms = read_rxnorm_archive(rxnorm_zip, expected_md5)
     icd_index = (
         build_term_index(read_icd10_snapshot(icd_path, expected_icd_sha256))
@@ -104,13 +108,89 @@ def augment_submission(
             raise ValueError("augmentation failed the parent-preservation gate")
         temporary_zip.replace(destination)
 
-    return {
+    diff_summary = {key: value for key, value in diff.items() if key != "details"}
+    report = {
+        "commit": _commit(),
+        "input_sha256": sha256(input_zip),
+        "parent_sha256": sha256(parent_zip),
+        "config_sha256": sha256(config_path),
+        "ontology_sha256": sha256(rxnorm_zip),
+        "output_sha256": child_preflight["sha256"],
+        "entry_count": child_preflight["entry_count"],
+        "entity_count": child_preflight["entity_count"],
+        "entity_counts": child_preflight["entity_counts"],
+        "candidate_count": child_preflight["candidate_count"],
+        "assertion_count": child_preflight["assertion_count"],
+        "model_id": manifest["model_id"],
+        "model_revision": manifest["model_revision"],
+        "model_parameters": manifest["model_parameters"],
+        "prompt_sha256": manifest["prompt_sha256"],
+        "model_proposal_count": sum(len(values) for values in proposals.values()),
+        "model_parse_error_count": _proposal_parse_error_count(
+            proposal_root,
+            documents,
+        ),
         "model_added_entity_count": model_report["accepted"],
         "model_rejections": {
             key: value for key, value in model_report.items() if key != "accepted"
         },
-        "diff": {key: value for key, value in diff.items() if key != "details"},
+        "diff": diff_summary,
+        "promotion_eligible": True,
     }
+    return report
+
+
+def _proposal_parse_error_count(root, documents):
+    return sum(
+        json.loads(
+            (Path(root) / "documents" / f"{Path(name).stem}.json").read_text(
+                encoding="utf-8"
+            )
+        )["parse_error_count"]
+        for name in documents
+    )
+
+
+def _commit():
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        text=True,
+        encoding="utf-8",
+    ).strip()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=Path, default=Path("input.zip"))
+    parser.add_argument("--parent", type=Path, required=True)
+    parser.add_argument("--model-proposals", type=Path, required=True)
+    parser.add_argument(
+        "--rxnorm",
+        type=Path,
+        default=Path("ontologies/rxnorm/RxNorm_full_prescribe_07062026.zip"),
+    )
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--icd", type=Path, default=DEFAULT_ICD10_PATH)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--expected-md5", default=PUBLISHED_RXNORM_MD5)
+    parser.add_argument("--expected-icd-sha256", default=PINNED_ICD10_SHA256)
+    args = parser.parse_args()
+    report = augment_submission(
+        args.input,
+        args.parent,
+        args.model_proposals,
+        args.rxnorm,
+        args.config,
+        args.output,
+        args.icd,
+        args.expected_md5,
+        args.expected_icd_sha256,
+    )
+    with args.report.open("x", encoding="utf-8") as output:
+        json.dump(report, output, ensure_ascii=False, indent=2, sort_keys=True)
+        output.write("\n")
+    print(json.dumps(report, ensure_ascii=True, sort_keys=True))
 
 
 def _read_parent_predictions(path, documents):

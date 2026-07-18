@@ -1,11 +1,14 @@
 import hashlib
 import json
+import sys
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from medical_race.submission import build_output_zip, validate_output_zip
+import tools.augment_submission as augment_module
 from tools.augment_submission import augment_submission
 from tools.generate_model_proposals import generate_proposal_directory
 
@@ -140,6 +143,131 @@ class AugmentSubmissionTest(unittest.TestCase):
             self.assertEqual(report["diff"]["removed_entities"], 0)
             self.assertEqual(report["diff"]["changed_entities"], 0)
             validate_output_zip(child_zip, documents)
+
+    def test_report_contains_reproducibility_fields_and_cli_writes_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                _,
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                rxnorm_md5,
+                config,
+            ) = self.prepare(root)
+            child_zip = root / "child.zip"
+            report_path = root / "child.report.json"
+            argv = [
+                "augment_submission.py",
+                "--input",
+                str(input_zip),
+                "--parent",
+                str(parent_zip),
+                "--model-proposals",
+                str(proposals),
+                "--rxnorm",
+                str(rxnorm_zip),
+                "--config",
+                str(config),
+                "--output",
+                str(child_zip),
+                "--report",
+                str(report_path),
+                "--expected-md5",
+                rxnorm_md5,
+            ]
+
+            with patch.object(sys, "argv", argv):
+                augment_module.main()
+
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["diff"]["added_entities"], 1)
+            self.assertTrue(report["promotion_eligible"])
+            self.assertEqual(report["model_parameters"], 4_000_000_000)
+            self.assertEqual(report["model_proposal_count"], 2)
+            for field in (
+                "parent_sha256",
+                "input_sha256",
+                "config_sha256",
+                "ontology_sha256",
+                "output_sha256",
+                "model_id",
+                "model_revision",
+                "model_rejections",
+                "entity_counts",
+                "candidate_count",
+                "assertion_count",
+            ):
+                self.assertIn(field, report)
+
+    def test_rejects_invalid_parent_before_creating_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                documents,
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                rxnorm_md5,
+                config,
+            ) = self.prepare(root)
+            corrupt_parent = root / "corrupt-parent.zip"
+            with zipfile.ZipFile(parent_zip) as source, zipfile.ZipFile(
+                corrupt_parent, "w"
+            ) as target:
+                for name in source.namelist():
+                    values = json.loads(source.read(name))
+                    if name == "output/1.json":
+                        values[0]["position"] = [0, 1]
+                    target.writestr(name, json.dumps(values, ensure_ascii=False))
+            destination = root / "child.zip"
+
+            with self.assertRaisesRegex(ValueError, "offset"):
+                augment_submission(
+                    input_zip,
+                    corrupt_parent,
+                    proposals,
+                    rxnorm_zip,
+                    config,
+                    destination,
+                    expected_md5=rxnorm_md5,
+                )
+            self.assertFalse(destination.exists())
+
+    def test_rejects_proposal_hash_mismatch_before_creating_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (
+                _,
+                input_zip,
+                parent_zip,
+                proposals,
+                rxnorm_zip,
+                rxnorm_md5,
+                config,
+            ) = self.prepare(root)
+            record_path = proposals / "documents" / "1.json"
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            record["raw_sha256"] = "0" * 64
+            record_path.write_text(
+                json.dumps(record, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            destination = root / "child.zip"
+
+            with self.assertRaisesRegex(ValueError, "input SHA-256"):
+                augment_submission(
+                    input_zip,
+                    parent_zip,
+                    proposals,
+                    rxnorm_zip,
+                    config,
+                    destination,
+                    expected_md5=rxnorm_md5,
+                )
+            self.assertFalse(destination.exists())
 
 
 if __name__ == "__main__":
