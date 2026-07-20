@@ -1,7 +1,7 @@
 # Team Onboarding
 
 This repository is an offline clinical NLP system for the Viettel AI Race 2026 task.
-The current stable evidence is Submission 8 and corrected Submission 9 at score `16.13250`.
+The current best Round 1 evidence is Submission 12 at score `17.25890`.
 When the organizer confirms the update is live, start with the [post-update bring-up checklist](post_update_bringup_checklist.md).
 
 The active three-person assignments, file boundaries, and Git workflow are in [Team Workstreams, 16 July 2026](TEAM_WORKSTREAMS_2026-07-16.md).
@@ -51,10 +51,10 @@ The current baseline is verified by the full suite command above; the exact coun
 
 ## Current state
 
-Submission 8 is the stable baseline at score `16.13250`.
-Its components were WER `84.6803`, assertion Jaccard `16.933`, and candidate Jaccard `16.1416`.
-Corrected Submission 9 is a valid final archive and reproduced Submission 8 at score `16.13250`.
-Submission 9 was a packaging and reproducibility control, not a leaderboard improvement.
+Submission 12 is the current candidate at score `17.25890`.
+Its components were WER `82.6481`, assertion Jaccard `18.6554`, and candidate Jaccard `16.1416`.
+It preserves every Submission 8 entity and adds 91 precision-filtered Qwen entities.
+Submission 8 remains the reproducible parent control at score `16.13250`.
 Do not start post-update work until the user explicitly confirms that the organizer update is live.
 
 The main strategic gap is recall and candidate linking, not packaging.
@@ -62,23 +62,23 @@ Small rule tweaks are lower priority than interpretable coverage or linking impr
 
 ## Pick one bounded task
 
-### A. Submission 9 audit
+### A. Post-update intake
 
-Use this when the Qwen archive returns.
+Use this only after the team lead confirms that the organizer update is live and preserves the new official artifacts.
 
 Definition of done:
 
-- Validate all 100 proposal records against `input.zip`.
-- Report chunk count, parse errors, proposal count, and proposal counts by type.
-- Build a semantic diff against Submission 8.
-- Do not change acceptance gates until the evidence is written down.
+- Follow `docs/post_update_bringup_checklist.md` in order.
+- Hash and preserve the new input and official problem statement before running code.
+- Build unchanged rule and Qwen controls before changing extraction, linking, assertions, or prompts.
+- Classify contract and distribution drift before selecting one experiment variable.
 
 Primary files:
 
-- `outputs/model_proposals/`
-- `tools/build_submission.py`
-- `tools/diff_submissions.py`
-- `docs/next_submission_queue_2026-07-14-qwen.md`
+- `docs/post_update_bringup_checklist.md`
+- `research/competition_policy.md`
+- `tools/audit_sources.py`
+- `tools/build_controls.py`
 
 ### B. Candidate-linking recall
 

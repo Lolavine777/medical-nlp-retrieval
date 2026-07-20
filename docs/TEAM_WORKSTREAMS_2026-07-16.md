@@ -1,7 +1,8 @@
 # Team Workstreams, 16 July 2026
 
 This page is the active assignment board for the three-person team.
-The stable Round 1 leaderboard result is `16.13250`, and corrected Submission 9 reproduced that result without improving it.
+The current best Round 1 result is Submission 12 at `17.25890`.
+Submission 8 remains its reproducible parent control at `16.13250`.
 
 The organizer announcement supplied by the team lead says Round 1 remains active until Tuesday, 21 July 2026, when the upgraded problem and dataset are expected.
 The deadline is expected to move to the end of 4 August 2026.
@@ -48,7 +49,7 @@ Owned files:
 
 First deliverable:
 
-1. Reproduce or inspect the current audit of 347 queries: 132 linked, 56 ambiguous, and 159 unlinked.
+1. Reproduce or inspect the current audit of 171 queries: 111 linked, 39 ambiguous, and 21 unlinked.
 2. Group the ambiguous and unlinked cases by reusable failure class in `research/linking_error_inventory_round1.md`.
 3. Add deterministic lexical top-k ranking diagnostics with tests.
 4. Prove that existing top-one linker outputs and default pipeline predictions remain unchanged.
@@ -67,7 +68,7 @@ Do not change output candidate cardinality in this branch.
 Message to send:
 
 > Bạn phụ trách retrieval/reranking ICD và RxNorm.
-> Bắt đầu từ `master`, tạo branch `team-a/linking-recall`, rồi phân loại 159 query chưa link và 56 query ambiguous thành các nhóm lỗi tổng quát.
+> Bắt đầu từ `master`, tạo branch `team-a/linking-recall`, rồi phân loại 21 query chưa link và 39 query ambiguous thành các nhóm lỗi tổng quát.
 > Deliverable đầu tiên là error inventory và lexical top-k diagnostics có test, nhưng top-one output hiện tại phải giữ nguyên mặc định.
 > Không sửa `pipeline.py`, config submission, packaging hoặc `docs/submissions.csv`.
 
